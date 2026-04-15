@@ -5,15 +5,14 @@ import starlightVersions from 'starlight-versions';
 import mermaid from 'astro-mermaid';
 
 export default defineConfig({
-	site: 'https://tucario.github.io',
-	base: '/FTS-Docs',
 	integrations: [
 		mermaid(),
 		starlight({
 			title: 'Flexible Team Share',
 			logo: {
-				src: './src/assets/logo.png',
+				src: './src/assets/logo.svg',
 				alt: 'Flexible Team Share Logo',
+				replacesTitle: false,
 			},
 			customCss: ['./src/styles/custom.css'],
 			defaultLocale: 'root',
