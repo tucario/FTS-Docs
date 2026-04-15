@@ -1,0 +1,231 @@
+---
+title: アーキテクチャ概要
+description: Flexible Team Shareソリューションの技術アーキテクチャ。
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+このドキュメントは、システムアーキテクチャ、データフロー、処理レイヤーを含む、Flexible Team Shareソリューションの詳細な技術説明を提供します。
+
+## システムアーキテクチャ
+
+```mermaid
+flowchart TB
+    subgraph UI["UI LAYER"]
+        direction LR
+        LWC1["objectTeamMember<br/>Team member list & management"]
+        LWC2["objectTeamMemberWizard<br/>Admin configuration"]
+        LWC3["ftsLabels<br/>Custom labels utility"]
+    end
+
+    subgraph CTRL["CONTROLLER LAYER"]
+        direction LR
+        C1["ObjectTeamMemberController<br/>CRUD operations for team members"]
+        C2["TeamMemberWizardController<br/>Configuration wizard operations"]
+    end
+
+    subgraph DATA["DATA LAYER"]
+        direction LR
+        D1["ObjectTeamMember__c<br/>Team member assignments"]
+        D2["Team_Sharing_Config__c<br/>Per-object sharing config"]
+        D3["FlexiTeamShare_Config__mdt<br/>App configuration"]
+        D4["Triggers:<br/>ObjectTeamMemberTrigger"]
+    end
+
+    subgraph ASYNC["ASYNC PROCESSING LAYER"]
+        direction LR
+        A1["ShareRecordQueueable<br/>Create/update/delete shares"]
+        A2["SharingRecalculationBatch<br/>Bulk recalculation"]
+        A3["ExpiredTeamMemberCleanupBatch<br/>Daily cleanup of expired members"]
+    end
+
+    subgraph SHARE["SALESFORCE SHARING MODEL"]
+        direction LR
+        S1["Standard Share Objects<br/>AccountShare, ContactShare,<br/>CaseShare, LeadShare,<br/>OpportunityShare, etc."]
+        S2["Custom Object Shares<br/>[CustomObject]__Share"]
+        S3["ObjectTeamMember__Share<br/>Team member visibility"]
+    end
+
+    UI --> CTRL
+    CTRL --> DATA
+    DATA --> ASYNC
+    ASYNC --> SHARE
+```
+
+## レイヤー
+
+### UIレイヤー
+
+3つのLightning Web Components：
+
+| コンポーネント | 目的 |
+|-----------|---------|
+| **objectTeamMember** | レコードページにチームメンバーを表示します。追加/編集/削除、折りたたみ可能なリスト、設定可能な表示制限をサポートします。 |
+| **objectTeamMemberWizard** | オブジェクトの設定、設定の管理、ジョブのスケジューリングを行う管理インターフェース。 |
+| **ftsLabels** | i18nサポート（35言語）のためのCustom Labelsを提供するユーティリティコンポーネント。 |
+
+### Controllerレイヤー
+
+| Controller | メソッド |
+|-----------|---------|
+| **ObjectTeamMemberController** | `getTeamMembers()`、`addTeamMember()`、`updateTeamMember()`、`removeTeamMember()`、`isCurrentUserManager()`、`isSharingConfigured()`、`getAccessLevelOptions()` |
+| **TeamMemberWizardController** | `getExistingConfigs()`、`getAvailableObjects()`、`createConfig()`、`toggleConfigStatus()`、`deleteConfig()`、`getScheduledJobInfo()`、`scheduleCleanupJob()` |
+| **SyncOwnerInvocable** | `syncOwners()` — 親オーナーが変更されたときにOwnerチームメンバーを同期するInvocable Action。FlowまたはApexから呼び出し可能で、完全にバルク化されています。 |
+
+### Dataレイヤー
+
+カスタムオブジェクトと、チームメンバーの変更時に起動するトリガー：
+
+- **ObjectTeamMember__c** — チームメンバーの割り当てを保存
+- **Team_Sharing_Config__c** — オブジェクトごとの共有設定
+- **FlexiTeamShare_Config__mdt** — アプリレベルの設定（Custom Metadata）
+- **ObjectTeamMemberTrigger** → **ObjectTeamMemberTriggerHandler** — Before Insert、Before Update、Before Deleteを処理
+
+### 非同期処理レイヤー
+
+| コンポーネント | タイプ | 目的 |
+|-----------|------|---------|
+| **ShareRecordQueueable** | Queueable | 親オブジェクトとチームメンバーの共有レコードを作成、更新、削除 |
+| **SharingRecalculationBatch** | Batchable | 設定変更時にすべての共有をバルク再計算 |
+| **ExpiredTeamMemberCleanupBatch** | Batchable | 期限切れのチームメンバーを削除（毎日のスケジュールジョブ） |
+| **ExpiredTeamMemberCleanupScheduler** | Schedulable | クリーンアップバッチをスケジュール（毎日午前2:00に実行） |
+
+## データフロー：チームメンバーの追加
+
+```mermaid
+sequenceDiagram
+    actor User
+    participant LWC as objectTeamMember LWC
+    participant Ctrl as ObjectTeamMemberController
+    participant DB as Database
+    participant Queue as ShareRecordQueueable
+
+    User->>LWC: Click "Add Team Member"
+    LWC->>LWC: Collect input (User, Access Level, Role, End Date)
+    LWC->>Ctrl: addTeamMember(recordId, userId, accessLevel, role, endDate)
+
+    Ctrl->>Ctrl: Check for duplicates
+    Ctrl->>Ctrl: Verify CRUD permissions
+
+    Ctrl->>DB: INSERT ObjectTeamMember__c
+    DB-->>Ctrl: Success
+
+    Note over Ctrl,Queue: Trigger fires after insert
+    Ctrl->>Queue: System.enqueueJob()
+
+    Ctrl-->>LWC: Return success
+    LWC-->>User: Refresh team member list
+
+    Note over Queue: Async processing
+    Queue->>DB: INSERT [Object]Share
+    Queue->>DB: INSERT ObjectTeamMember__Share
+```
+
+## データフロー：オーナー変更の同期
+
+```mermaid
+sequenceDiagram
+    actor Admin
+    participant Flow as Record-Triggered Flow
+    participant Inv as SyncOwnerInvocable
+    participant DB as Database
+    participant Queue as ShareRecordQueueable
+
+    Note over Admin: Changes record owner
+
+    Admin->>DB: UPDATE Account SET OwnerId = :newOwner
+    DB-->>Flow: Trigger: OwnerId changed
+
+    Flow->>Inv: syncOwners([recordId])
+
+    Inv->>DB: SELECT FROM ObjectTeamMember__c WHERE Role__c = 'Owner'
+    DB-->>Inv: Owner team member
+
+    Inv->>DB: SELECT OwnerId FROM Account
+    DB-->>Inv: New owner ID
+
+    alt Owner changed
+        Inv->>DB: UPDATE ObjectTeamMember__c SET User_Id__c = :newOwner
+        DB-->>Inv: Success
+
+        Inv->>Queue: System.enqueueJob()
+
+        Note over Queue: Async processing
+        Queue->>DB: DELETE old AccountShare (if not member)
+        Queue->>DB: INSERT new AccountShare
+    else Owner unchanged
+        Inv-->>Flow: success=true, "Owner unchanged"
+    end
+
+    Inv-->>Flow: SyncOwnerResult
+```
+
+## データフロー：期限切れメンバーのクリーンアップ
+
+```mermaid
+flowchart TB
+    A["Salesforce Scheduler<br/>(2:00 AM daily)"] --> B["ExpiredTeamMemberCleanupScheduler"]
+    B --> C["ExpiredTeamMemberCleanupBatch"]
+    C --> D["Query:<br/>SELECT FROM ObjectTeamMember__c<br/>WHERE End_Date__c < TODAY()"]
+    D --> E["DELETE expired records<br/>(triggers remove shares)"]
+```
+
+## エラーハンドリング
+
+### Controllerレイヤー
+
+- すべてのpublicメソッドがtry-catchでラップされています
+- Custom Labelsを介したユーザーフレンドリーなエラーメッセージ
+- LWCエラー表示のための`AuraHandledException`
+
+### 非同期処理
+
+- `Database.insert/update/delete(records, false)` — 部分的な成功
+- 個別のエラーはログに記録され、バッチ全体が失敗することはありません
+- バッチジョブでエラー統計を追跡
+
+### Triggerレイヤー
+
+- トリガーハンドラーパターンが再帰を防止
+- エラーはDML操作の呼び出し元に表示されます
+
+## パフォーマンスに関する考慮事項
+
+### 非同期処理
+
+- 共有レコード操作はQueueableを使用（ノンブロッキング）
+- バルク操作は設定可能なバッチサイズでBatchableを使用
+- トリガーで共有レコードの同期DMLなし
+
+### クエリの最適化
+
+- WHERE句でインデックス付きフィールドを使用
+- `Record_Id__c`形式により効率的なLIKEクエリが可能
+- LIMIT句で結果セットを制限
+
+### キャッシング
+
+- 読み取り操作には`@AuraEnabled(cacheable=true)`
+- トランザクション内でアプリ設定をキャッシュ
+
+## 統合アーキテクチャ
+
+**外部統合なし** — このパッケージは完全にSalesforce内で動作します：
+
+- HTTPコールアウトなし
+- 外部APIなし
+- Named Credentialsなし
+- External Objectsなし
+- Connected Appsなし
+
+### プラットフォームの依存関係
+
+| コンポーネント | 使用方法 |
+|-----------|-------|
+| Apex Sharing | 共有レコードの作成/管理 |
+| Queueable Apex | 非同期共有レコード操作 |
+| Batchable Apex | バルク共有再計算、クリーンアップ |
+| Schedulable Apex | 毎日のクリーンアップジョブ |
+| Custom Metadata | アプリ設定 |
+| Lightning Web Components | ユーザーインターフェース |
+| Custom Labels | 国際化 |

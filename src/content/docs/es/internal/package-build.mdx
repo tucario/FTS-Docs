@@ -1,0 +1,164 @@
+---
+title: Construcción de Paquete
+description: Referencia rápida para construir versiones del paquete FlexibleTeamShare.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+## Requisitos Previos
+
+- Salesforce CLI instalado (`sf`)
+- Autenticado a la organización Dev Hub
+- Directorio de trabajo: raíz del proyecto
+
+## Paquete Beta
+
+### Construir Nuevo Beta
+
+```bash
+sf package version create \
+  --package FlexibleTeamShare \
+  --definition-file config/package-scratch-def.json \
+  --installation-key-bypass \
+  --wait 30 \
+  --code-coverage \
+  --skip-ancestor-check
+```
+
+### Construir Beta (con contraseña de instalación)
+
+```bash
+sf package version create \
+  --package FlexibleTeamShare \
+  --definition-file config/package-scratch-def.json \
+  --installation-key YOUR_PASSWORD \
+  --wait 30 \
+  --code-coverage \
+  --skip-ancestor-check
+```
+
+<Aside type="caution">
+Siempre pase `--definition-file config/package-scratch-def.json` explícitamente para asegurar que la organización de construcción tenga Translation Workbench habilitado. La propiedad `definitionFile` en `sfdx-project.json` puede no siempre ser reconocida de manera confiable.
+</Aside>
+
+## Paquete de Lanzamiento (Promovido)
+
+### Paso 1: Listar versiones existentes
+
+```bash
+sf package version list \
+  --packages FlexibleTeamShare \
+  --order-by CreatedDate \
+  --verbose
+```
+
+### Paso 2: Promover beta a lanzamiento
+
+Reemplace `04t...` con el ID de versión real del paso 1:
+
+```bash
+sf package version promote --package 04tXXXXXXXXXXXXXXX
+```
+
+## Comandos Útiles
+
+### Verificar detalles de versión del paquete
+
+```bash
+sf package version list \
+  --packages FlexibleTeamShare \
+  --order-by CreatedDate \
+  --verbose
+```
+
+### Obtener URL de instalación
+
+```bash
+sf package version list \
+  --packages FlexibleTeamShare \
+  --order-by CreatedDate \
+  --verbose --json
+```
+
+Busque `SubscriberPackageVersionId` (comienza con `04t`).
+
+Formato de URL de instalación:
+```
+https://login.salesforce.com/packaging/installPackage.apexp?p0=04tXXXXXXXXXXXXXXX
+```
+
+### Verificar cobertura de código
+
+```bash
+sf package version report --package 04tXXXXXXXXXXXXXXX --verbose
+```
+
+### Eliminar versión fallida/no deseada
+
+```bash
+sf package version delete --package 04tXXXXXXXXXXXXXXX --no-prompt
+```
+
+## Numeración de Versiones
+
+Configurado en `sfdx-project.json`:
+
+| Campo | Ejemplo | Descripción |
+|-------|---------|-------------|
+| `versionNumber` | `1.0.0.NEXT` | MAJOR.MINOR.PATCH.BUILD |
+| `NEXT` | auto | Auto-incrementa el número de compilación |
+
+### Aumentar versión manualmente
+
+Edite `sfdx-project.json`:
+
+```json
+"versionNumber": "1.1.0.NEXT"
+```
+
+## Problemas Comunes
+
+### "Ancestor version required"
+
+Agregue la bandera `--skip-ancestor-check` o establezca el ancestro en `sfdx-project.json`.
+
+### "Code coverage below 75%"
+
+Ejecute las pruebas localmente primero:
+
+```bash
+sf apex run test --code-coverage --result-format human --wait 10
+```
+
+### "Translation languages not available"
+
+1. Asegúrese de que `definitionFile` esté establecido en `sfdx-project.json`
+2. Asegúrese de que `config/package-scratch-def.json` tenga edición Enterprise y las tres configuraciones de idioma:
+
+```json
+{
+  "orgName": "Package Build Org",
+  "edition": "Enterprise",
+  "features": ["EnableSetPasswordInApi"],
+  "settings": {
+    "lightningExperienceSettings": {
+      "enableS1DesktopEnabled": true
+    },
+    "languageSettings": {
+      "enableTranslationWorkbench": true,
+      "enableEndUserLanguages": true,
+      "enablePlatformLanguages": true
+    }
+  }
+}
+```
+
+## Referencia Rápida
+
+| Acción | Comando |
+|--------|---------|
+| Construir beta | `sf package version create --package FlexibleTeamShare --definition-file config/package-scratch-def.json --installation-key-bypass --wait 30 --code-coverage --skip-ancestor-check` |
+| Listar versiones | `sf package version list --packages FlexibleTeamShare --order-by CreatedDate --verbose` |
+| Promover a lanzamiento | `sf package version promote --package 04tXXX...` |
+| Verificar cobertura | `sf package version report --package 04tXXX... --verbose` |
+| Eliminar versión | `sf package version delete --package 04tXXX... --no-prompt` |

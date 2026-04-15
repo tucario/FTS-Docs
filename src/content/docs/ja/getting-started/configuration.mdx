@@ -1,0 +1,263 @@
+---
+title: 設定
+description: Flexible Team Shareコンポーネント、オーナー同期、スケジュールジョブの設定。
+---
+
+import { Aside, Steps } from '@astrojs/starlight/components';
+
+## コンポーネント設定
+
+Object Team MemberコンポーネントはLightning App Builderで直接設定できます。以下のプロパティを使用できます：
+
+| プロパティ | タイプ | デフォルト | 説明 |
+|----------|------|---------|-------------|
+| **Card Title** | String | Team Members | コンポーネントカードに表示されるタイトル |
+| **Max Displayed Members** | Integer | 5 | 折りたたむ前に表示されるチームメンバーの最大数。すべて表示するには0に設定 |
+
+チームメンバーの数が設定された制限を超えると、リストが折りたたまれ、**「Show all (X more)」**ボタンが表示されます。これをクリックすると完全なリストが展開され、**「Show less」**ボタンで再び折りたたむことができます。レコードオーナーは、表示制限に関係なく常にリストの最初に表示されます。
+
+![Collapsed team member list](../../../../assets/pictures/team-members-collapsed.png)
+
+![Lightning App Builder — component properties](../../../../assets/pictures/app-builder-config.png)
+
+### 表示制限の動作
+
+| 設定 | 動作 |
+|---------|----------|
+| Max Displayed Members = **5**（デフォルト） | 最初の5人のメンバーを表示し、残りは「Show X more」で表示 |
+| Max Displayed Members = **0** | すべてのチームメンバーが表示され、折りたたみ/展開なし |
+| Max Displayed Members = **3**（カスタム） | 最初の3人のメンバーを表示し、残りは「Show X more」で表示 |
+
+## チームメンバーのロール
+
+ユーザーをチームに追加する際、以下のいずれかのロールを割り当てます：
+
+| ロール | 説明 | 機能 |
+|------|-------------|-------------|
+| **Owner** | レコードオーナー | レコード作成時に自動的に割り当てられます。手動で割り当てたり削除したりすることはできません。チームメンバーを管理する完全なアクセス権を持ちます。チーム内に他のユーザーがいない場合は自動的に削除されます。 |
+| **Manager** | チーム管理者 | チームメンバーの追加、編集、削除が可能です。チーム構成を管理する必要があるユーザーにこのロールを使用します。 |
+| **User** | 標準チームメンバー | チームメンバーのリストを表示できますが、変更はできません。レコードへのアクセスのみが必要なユーザーにこのロールを使用します。 |
+
+![Team Members component showing roles](../../../../assets/pictures/team-members-expanded.png)
+
+<Aside type="note">
+- **Owner**ロールはシステムによって自動的に作成され、現在のレコードオーナーを表します
+- **Manager**と**User**ロールはどちらも、割り当てられたアクセスレベル（Read OnlyまたはRead/Write）に基づいてレコードアクセス権を受け取ります
+- **Owner**または**Manager**ロールを持つユーザーのみが、チームメンバーを追加、編集、削除できます
+</Aside>
+
+## オーナー変更の同期
+
+レコードオーナーが変更されたとき（例：アカウントが別の営業担当者に再割り当てされた場合）、Ownerチームメンバーは**自動的に更新されません**。システムは最初のチームメンバーが追加されたときにOwnerレコードを作成しますが、親レコードの後続のオーナー変更は追跡しません。
+
+チームOwnerをレコードオーナーと同期するには、**Record-Triggered Flow**を作成する必要があります。
+
+<Aside type="note" title="なぜ自動ではないのですか？">
+Salesforceマネージドパッケージは、AccountやOpportunityなどの標準オブジェクトにトリガーを含めることができません。Flexible Team Shareは、必要に応じてFlowから呼び出すことができる**Invocable Action**を提供しています。
+</Aside>
+
+### Flowによるセットアップ（推奨）
+
+<Steps>
+1. **設定** > **Flows**に移動
+2. **New Flow** > **Record-Triggered Flow**をクリック
+3. オブジェクトを選択（例：Account）
+4. トリガーを設定：**「A record is updated」**
+5. Entry Conditionを追加：Formula > `ISCHANGED({!$Record.OwnerId})`が`true`と評価される
+6. **「When to Run the Flow」**を**「After the record is saved」**に設定
+7. **Action**要素を追加
+8. **「Sync Team Member Owner」**を検索
+9. **「Record ID」**パラメータを`{!$Record.Id}`に設定
+10. **「Object API Name」**は空のままにする（Record IDから自動導出）
+11. 保存して**有効化**
+</Steps>
+
+![Flow Builder - Owner Sync Flow](../../../../assets/pictures/flow-builder-owner-sync.png)
+![Sync Team Member Owner action configuration](../../../../assets/pictures/sync-owner-action-config.png)
+
+<Aside type="tip">
+自動オーナー同期が必要な各オブジェクト（例：Account、Opportunity、Case、Lead）でこれらの手順を繰り返します。
+</Aside>
+
+### Apexトリガーによるセットアップ
+
+```apex
+trigger AccountOwnerSync on Account(after update) {
+  List<tucariofts.SyncOwnerInvocable.SyncOwnerRequest> requests =
+    new List<tucariofts.SyncOwnerInvocable.SyncOwnerRequest>();
+
+  for (Account acc : Trigger.new) {
+    Account oldAcc = Trigger.oldMap.get(acc.Id);
+    if (acc.OwnerId != oldAcc.OwnerId) {
+      tucariofts.SyncOwnerInvocable.SyncOwnerRequest req =
+        new tucariofts.SyncOwnerInvocable.SyncOwnerRequest();
+      req.recordId = acc.Id;
+      requests.add(req);
+    }
+  }
+
+  if (!requests.isEmpty()) {
+    tucariofts.SyncOwnerInvocable.syncOwners(requests);
+  }
+}
+```
+
+### Apexコードから呼び出す（単一レコード）
+
+```apex
+tucariofts.SyncOwnerInvocable.SyncOwnerRequest request =
+    new tucariofts.SyncOwnerInvocable.SyncOwnerRequest();
+request.recordId = accountId;
+
+List<tucariofts.SyncOwnerInvocable.SyncOwnerResult> results =
+    tucariofts.SyncOwnerInvocable.syncOwners(
+        new List<tucariofts.SyncOwnerInvocable.SyncOwnerRequest>{ request }
+    );
+
+if (results[0].success) {
+    System.debug('Owner synced: ' + results[0].oldOwnerId +
+                 ' → ' + results[0].newOwnerId);
+} else {
+    System.debug('Sync failed: ' + results[0].message);
+}
+```
+
+### 結果オブジェクト
+
+| フィールド | タイプ | 説明 |
+|-------|------|-------------|
+| `success` | Boolean | 同期が成功したかどうか |
+| `message` | String | 結果メッセージまたはエラーの詳細 |
+| `oldOwnerId` | Id | 以前のオーナーのUser ID |
+| `newOwnerId` | Id | 新しいオーナーのUser ID |
+
+### エラーシナリオ
+
+| シナリオ | 結果 |
+|----------|--------|
+| レコードにチームメンバーがいない | `success = false`、「No Owner team member found」 |
+| オーナーが変更されていない | `success = true`、「Owner unchanged, no update needed」 |
+| Record IDがnull | `success = false`、「Record ID is required」 |
+| 無効なレコードID | `success = false`、エラーメッセージ |
+
+### 重要な制限事項
+
+**キューオーナーはサポートされていません** — Flexible Team Shareはキューをチームオーナーとしてサポートしていません。レコードがキューに所有されている場合：
+
+- システムは**現在のユーザー**（最初にチームメンバーを追加した人）をチームのOwnerとして使用します
+- 後でレコードオーナーをキューからユーザーに変更した場合は、Sync Ownerアクションを実行してチームを更新してください
+- オーナーをユーザーからキューに変更した場合、チームOwnerは以前のユーザーのままになります
+
+**Flowはオブジェクトごとに作成する必要があります** — オーナー同期が必要な各オブジェクトタイプに対して、個別のFlowを作成する必要があります。Invocable Actionはどのオブジェクトでも機能しますが、SalesforceではオブジェクトごとにRecord-Triggered Flowを個別に作成する必要があります。
+
+## 終了日による一時的なアクセス
+
+チームメンバーを追加する際、オプションで**終了日**を設定して、レコードへの一時的なアクセスを付与できます。これは以下の場合に便利です：
+
+- 期限が定められたプロジェクトベースのコラボレーション
+- 一時的なコンサルタントまたは請負業者
+- 休暇カバーまたは委任された責任
+- 監査またはレビュー期間
+
+### 動作の仕組み
+
+<Steps>
+1. チームメンバーを追加または編集する際、**終了日**フィールドをアクセス権を持つ最後の日に設定
+2. チームメンバーはその日の終わりまで完全なアクセス権を保持
+3. 終了日が経過した後、スケジュールされたクリーンアップジョブが自動的にチームメンバーを削除し、アクセス権を取り消す
+</Steps>
+
+![Team member with End Date](../../../../assets/pictures/team-members-end-date.png)
+
+### 自動クリーンアッププロセス
+
+- スケジュールされたバッチジョブが毎日実行され（デフォルトでは午前2:00）、期限切れのチームメンバーを削除します
+- チームメンバーが削除されると、共有レコードも削除され、レコードへのアクセス権が取り消されます
+- クリーンアップジョブはConfiguration Wizardから管理できます
+
+![Scheduled job management](../../../../assets/pictures/install-guide-14.png)
+
+## Scheduled Job
+
+Flexible Team Shareには、期限切れのチームメンバーを削除する自動クリーンアップジョブが含まれています。このジョブはパッケージのインストール時に自動的にスケジュールされます。
+
+### ジョブの確認
+
+<Steps>
+1. **設定** > **Scheduled Jobs**に移動
+2. **Flexible Team Share - Expired Member Cleanup**を探す
+3. ジョブが毎日実行されるようにスケジュールされていることを確認
+</Steps>
+
+![Scheduled Jobs in Setup](../../../../assets/pictures/install-guide-20.png)
+
+### 手動ジョブ管理
+
+管理者はConfiguration Wizardからクリーンアップジョブを管理できます：
+
+- **Schedule Job** — 実行されていない場合に手動でスケジュール
+- **Unschedule Job** — 自動クリーンアップを停止
+- **Run Now** — 即座にクリーンアップを実行
+
+## トラブルシューティング
+
+### 「設定が見つかりません」警告
+
+**症状：** このオブジェクトの設定が存在しないという警告モーダルが表示されます。
+
+**原因：** Configuration Wizardでオブジェクトを設定する前に、チームメンバーコンポーネントがレコードページに追加されました。
+
+**解決策：**
+<Steps>
+1. Configuration Wizard（Flexible Team Shareアプリ > Configuration）に移動
+2. このオブジェクトの設定を追加してデプロイ
+3. レコードページに戻る — コンポーネントが正しく機能するはずです
+</Steps>
+
+![Configuration Not Found warning](../../../../assets/pictures/install-guide-15.png)
+
+### 「アクセスなし」エラー
+
+**症状：** コンポーネントにチームメンバーの代わりに「アクセスなし」メッセージとロックアイコンが表示されます。
+
+**原因：** 現在のユーザーに必要なPermission Set Groupが割り当てられていません。
+
+**解決策：**
+<Steps>
+1. **設定** > **Permission Set Groups**に移動
+2. 影響を受けるユーザーに**Admin**または**User** Permission Set Groupを割り当て
+3. ユーザーは変更を有効にするためにログアウトして再ログインする必要がある場合があります
+</Steps>
+
+![No Access error](../../../../assets/pictures/install-guide-16.png)
+
+### 「制限に到達しました」警告
+
+**症状：** 「Add Team Member」ボタンが無効になり、制限に到達したことを示すメッセージが表示されます。
+
+**原因：** 許可されているチームメンバーの最大数に到達しました。
+
+**解決策：** 非アクティブまたは不要なチームメンバーを削除してスロットを空けます。
+
+| 制限内のチームメンバー | 制限を超えたチームメンバー |
+|:-----|:-----|
+| ![Within limit](../../../../assets/pictures/install-guide-17.png) | ![Beyond limit](../../../../assets/pictures/install-guide-18.png) |
+
+![Limit reached warning detail](../../../../assets/pictures/install-guide-19.png)
+
+### 共有が機能しない
+
+**症状：** チームメンバーが正常に追加されたが、レコードにアクセスできません。
+
+**原因：** オブジェクトの組織の共有設定（OWD）がPublic Read/Writeに設定されています。
+
+**解決策：**
+<Steps>
+1. **設定** > **共有設定**に移動
+2. オブジェクトのOWDを**Private**または**Public Read Only**に変更
+3. 注意：OWD設定の変更は他のユーザーのアクセスに影響を与える可能性があります — Salesforce管理者に相談してください
+</Steps>
+
+## サポート
+
+質問や問題については、[support@tucario.com](mailto:support@tucario.com)までお問い合わせください。

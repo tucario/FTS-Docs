@@ -1,0 +1,232 @@
+---
+title: Architecture Overview
+description: Technical architecture of the Flexible Team Share solution.
+slug: 1.0/architecture/overview
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+This document provides a detailed technical description of the Flexible Team Share solution, including system architecture, data flow, and processing layers.
+
+## System Architecture
+
+```mermaid
+flowchart TB
+    subgraph UI["UI LAYER"]
+        direction LR
+        LWC1["objectTeamMember<br/>Team member list & management"]
+        LWC2["objectTeamMemberWizard<br/>Admin configuration"]
+        LWC3["ftsLabels<br/>Custom labels utility"]
+    end
+
+    subgraph CTRL["CONTROLLER LAYER"]
+        direction LR
+        C1["ObjectTeamMemberController<br/>CRUD operations for team members"]
+        C2["TeamMemberWizardController<br/>Configuration wizard operations"]
+    end
+
+    subgraph DATA["DATA LAYER"]
+        direction LR
+        D1["ObjectTeamMember__c<br/>Team member assignments"]
+        D2["Team_Sharing_Config__c<br/>Per-object sharing config"]
+        D3["FlexiTeamShare_Config__mdt<br/>App configuration"]
+        D4["Triggers:<br/>ObjectTeamMemberTrigger"]
+    end
+
+    subgraph ASYNC["ASYNC PROCESSING LAYER"]
+        direction LR
+        A1["ShareRecordQueueable<br/>Create/update/delete shares"]
+        A2["SharingRecalculationBatch<br/>Bulk recalculation"]
+        A3["ExpiredTeamMemberCleanupBatch<br/>Daily cleanup of expired members"]
+    end
+
+    subgraph SHARE["SALESFORCE SHARING MODEL"]
+        direction LR
+        S1["Standard Share Objects<br/>AccountShare, ContactShare,<br/>CaseShare, LeadShare,<br/>OpportunityShare, etc."]
+        S2["Custom Object Shares<br/>[CustomObject]__Share"]
+        S3["ObjectTeamMember__Share<br/>Team member visibility"]
+    end
+
+    UI --> CTRL
+    CTRL --> DATA
+    DATA --> ASYNC
+    ASYNC --> SHARE
+```
+
+## Layers
+
+### UI Layer
+
+Three Lightning Web Components:
+
+| Component | Purpose |
+|-----------|---------|
+| **objectTeamMember** | Displays team members on record pages. Supports add/edit/delete, collapsible list, and configurable display limit. |
+| **objectTeamMemberWizard** | Admin interface for configuring objects, managing settings, and scheduling jobs. |
+| **ftsLabels** | Utility component providing custom labels for i18n support (35 languages). |
+
+### Controller Layer
+
+| Controller | Methods |
+|-----------|---------|
+| **ObjectTeamMemberController** | `getTeamMembers()`, `addTeamMember()`, `updateTeamMember()`, `removeTeamMember()`, `isCurrentUserManager()`, `isSharingConfigured()`, `getAccessLevelOptions()` |
+| **TeamMemberWizardController** | `getExistingConfigs()`, `getAvailableObjects()`, `createConfig()`, `toggleConfigStatus()`, `deleteConfig()`, `getScheduledJobInfo()`, `scheduleCleanupJob()` |
+| **SyncOwnerInvocable** | `syncOwners()` — Invocable Action for syncing Owner team member when parent owner changes. Callable from Flow or Apex, fully bulkified. |
+
+### Data Layer
+
+Custom objects and a trigger that fires on team member changes:
+
+* **ObjectTeamMember\_\_c** — stores team member assignments
+* **Team\_Sharing\_Config\_\_c** — per-object sharing configuration
+* **FlexiTeamShare\_Config\_\_mdt** — app-level configuration (Custom Metadata)
+* **ObjectTeamMemberTrigger** → **ObjectTeamMemberTriggerHandler** — handles Before Insert, Before Update, Before Delete
+
+### Async Processing Layer
+
+| Component | Type | Purpose |
+|-----------|------|---------|
+| **ShareRecordQueueable** | Queueable | Creates, updates, and deletes share records for parent objects and team members |
+| **SharingRecalculationBatch** | Batchable | Bulk recalculates all shares when configuration changes |
+| **ExpiredTeamMemberCleanupBatch** | Batchable | Deletes expired team members (daily scheduled job) |
+| **ExpiredTeamMemberCleanupScheduler** | Schedulable | Schedules the cleanup batch (runs at 2:00 AM daily) |
+
+## Data Flow: Adding a Team Member
+
+```mermaid
+sequenceDiagram
+    actor User
+    participant LWC as objectTeamMember LWC
+    participant Ctrl as ObjectTeamMemberController
+    participant DB as Database
+    participant Queue as ShareRecordQueueable
+
+    User->>LWC: Click "Add Team Member"
+    LWC->>LWC: Collect input (User, Access Level, Role, End Date)
+    LWC->>Ctrl: addTeamMember(recordId, userId, accessLevel, role, endDate)
+
+    Ctrl->>Ctrl: Check for duplicates
+    Ctrl->>Ctrl: Verify CRUD permissions
+
+    Ctrl->>DB: INSERT ObjectTeamMember__c
+    DB-->>Ctrl: Success
+
+    Note over Ctrl,Queue: Trigger fires after insert
+    Ctrl->>Queue: System.enqueueJob()
+
+    Ctrl-->>LWC: Return success
+    LWC-->>User: Refresh team member list
+
+    Note over Queue: Async processing
+    Queue->>DB: INSERT [Object]Share
+    Queue->>DB: INSERT ObjectTeamMember__Share
+```
+
+## Data Flow: Owner Change Synchronization
+
+```mermaid
+sequenceDiagram
+    actor Admin
+    participant Flow as Record-Triggered Flow
+    participant Inv as SyncOwnerInvocable
+    participant DB as Database
+    participant Queue as ShareRecordQueueable
+
+    Note over Admin: Changes record owner
+
+    Admin->>DB: UPDATE Account SET OwnerId = :newOwner
+    DB-->>Flow: Trigger: OwnerId changed
+
+    Flow->>Inv: syncOwners([recordId])
+
+    Inv->>DB: SELECT FROM ObjectTeamMember__c WHERE Role__c = 'Owner'
+    DB-->>Inv: Owner team member
+
+    Inv->>DB: SELECT OwnerId FROM Account
+    DB-->>Inv: New owner ID
+
+    alt Owner changed
+        Inv->>DB: UPDATE ObjectTeamMember__c SET User_Id__c = :newOwner
+        DB-->>Inv: Success
+
+        Inv->>Queue: System.enqueueJob()
+
+        Note over Queue: Async processing
+        Queue->>DB: DELETE old AccountShare (if not member)
+        Queue->>DB: INSERT new AccountShare
+    else Owner unchanged
+        Inv-->>Flow: success=true, "Owner unchanged"
+    end
+
+    Inv-->>Flow: SyncOwnerResult
+```
+
+## Data Flow: Expired Member Cleanup
+
+```mermaid
+flowchart TB
+    A["Salesforce Scheduler<br/>(2:00 AM daily)"] --> B["ExpiredTeamMemberCleanupScheduler"]
+    B --> C["ExpiredTeamMemberCleanupBatch"]
+    C --> D["Query:<br/>SELECT FROM ObjectTeamMember__c<br/>WHERE End_Date__c < TODAY()"]
+    D --> E["DELETE expired records<br/>(triggers remove shares)"]
+```
+
+## Error Handling
+
+### Controller Layer
+
+* All public methods wrapped in try-catch
+* User-friendly error messages via Custom Labels
+* `AuraHandledException` for LWC error display
+
+### Async Processing
+
+* `Database.insert/update/delete(records, false)` — partial success
+* Individual errors logged, don't fail entire batch
+* Error statistics tracked in batch jobs
+
+### Trigger Layer
+
+* Trigger handler pattern prevents recursion
+* Errors surface to DML operation caller
+
+## Performance Considerations
+
+### Async Processing
+
+* Share record operations use Queueable (non-blocking)
+* Bulk operations use Batchable with configurable batch size
+* No synchronous DML on share records in triggers
+
+### Query Optimization
+
+* Indexed fields used in WHERE clauses
+* `Record_Id__c` format enables efficient LIKE queries
+* Limited result sets with LIMIT clauses
+
+### Caching
+
+* `@AuraEnabled(cacheable=true)` for read operations
+* App config cached in transaction
+
+## Integration Architecture
+
+**No external integrations** — this package operates entirely within Salesforce:
+
+* No HTTP callouts
+* No external APIs
+* No Named Credentials
+* No External Objects
+* No Connected Apps
+
+### Platform Dependencies
+
+| Component | Usage |
+|-----------|-------|
+| Apex Sharing | Creates/manages share records |
+| Queueable Apex | Async share record operations |
+| Batchable Apex | Bulk share recalculation, cleanup |
+| Schedulable Apex | Daily cleanup job |
+| Custom Metadata | App configuration |
+| Lightning Web Components | User interface |
+| Custom Labels | Internationalization |

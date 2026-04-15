@@ -1,0 +1,121 @@
+---
+title: Raport skanowania bezpieczeństwa
+description: Wyniki analizy statycznej kodu i najlepsze praktyki bezpieczeństwa.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+## Używane narzędzia skanowania
+
+| Narzędzie | Wersja | Przeznaczenie |
+|------|---------|---------|
+| Salesforce Code Analyzer v5 | Najnowsza | Analiza bezpieczeństwa Apex/LWC |
+| PMD (w tym reguły AppExchange) | v5 | Jakość kodu i bezpieczeństwo |
+| ESLint | v5 | Analiza JavaScript/LWC |
+| RetireJS | v5 | Podatne biblioteki JS |
+| Partner Security Portal (Checkmarx) | Najnowsza | Obowiązkowe skanowanie źródła |
+
+## Jak wygenerować raporty skanowania
+
+### Wymagania wstępne
+
+```bash
+# Zainstaluj Salesforce CLI
+npm install -g @salesforce/cli
+
+# Zainstaluj wtyczkę Code Analyzer v5
+sf plugins install @salesforce/plugin-code-analyzer
+```
+
+### Uruchom pełne skanowanie
+
+```bash
+# Uruchom wszystkie reguły z wyjściem HTML
+sf code-analyzer run --workspace force-app --output-file docs/scan-results.html
+
+# Uruchom reguły specyficzne dla AppExchange
+sf code-analyzer run --rule-selector AppExchange --workspace force-app --output-file docs/scan-appexchange.html
+
+# Uruchom tylko reguły oznaczone jako Security
+sf code-analyzer run --rule-selector Security --workspace force-app --output-file docs/scan-security.html
+
+# Niepowodzenie przy High lub Critical (CI/CD)
+sf code-analyzer run --rule-selector AppExchange --workspace force-app --severity-threshold 2 --output-file docs/scan-appexchange.html
+```
+
+## Zaimplementowane najlepsze praktyki bezpieczeństwa
+
+### Egzekwowanie CRUD/FLS
+
+- Sprawdzenie `isCreateable()` przed INSERT
+- Sprawdzenie `isUpdateable()` przed UPDATE
+- Sprawdzenie `isDeletable()` przed DELETE
+- Uprawnienia na poziomie pól przez Permission Sets
+
+### Zapobieganie wstrzykiwaniu SOQL
+
+- Bind variables używane dla danych wejściowych użytkownika
+- `String.escapeSingleQuotes()` dla zapytań dynamicznych
+- Nazwy obiektów wyprowadzane z ID Salesforce (nie danych wejściowych użytkownika)
+
+### Zgodność z modelem udostępniania
+
+- `with sharing` na głównych kontrolerach
+- `without sharing` tylko tam, gdzie udokumentowane i niezbędne
+- Rekordy udostępnień respektują ustawienia OWD
+
+### Bezpieczeństwo LWC
+
+- Brak `eval()` ani dynamicznego wykonywania skryptów
+- Dane wejściowe użytkownika oczyszczane przed wyświetleniem
+- Brak zakodowanych poświadczeń
+
+## Bezpieczeństwo integracji zewnętrznych
+
+| Sprawdzenie | Status | Uwagi |
+|-------|--------|-------|
+| Wywołania HTTP | N/A | Pakiet nie wykonuje wywołań zewnętrznych |
+| Named Credentials | N/A | Nie używane |
+| External Objects | N/A | Nie używane |
+| Remote Site Settings | N/A | Niewymagane |
+| Naruszenia CSP | Zaliczone | Brak naruszeń Content-Security-Policy |
+
+## Pokrycie testów Apex
+
+| Klasa | Pokrycie | Status |
+|-------|----------|--------|
+| ObjectTeamMemberController | >75% | Zaliczone |
+| TeamMemberWizardController | >75% | Zaliczone |
+| ShareRecordQueueable | >75% | Zaliczone |
+| SharingRecalculationBatch | >75% | Zaliczone |
+| ExpiredTeamMemberCleanupBatch | >75% | Zaliczone |
+| ObjectTeamMemberTriggerHandler | >75% | Zaliczone |
+| PostInstallHandler | >75% | Zaliczone |
+| **Ogółem** | **>75%** | **Zaliczone** |
+
+### Jak uruchomić testy z pokryciem
+
+```bash
+# Uruchom wszystkie testy z pokryciem
+sf apex run test --code-coverage --result-format human --target-org [ORG_ALIAS]
+
+# Uruchom konkretną klasę testową
+sf apex run test --tests ObjectTeamMemberTest --code-coverage --result-format human --target-org [ORG_ALIAS]
+```
+
+## Referencja poleceń skanera (Code Analyzer v5)
+
+```bash
+# Lista dostępnych reguł
+sf code-analyzer rules
+
+# Lista tylko reguł AppExchange
+sf code-analyzer rules --rule-selector AppExchange
+
+# Uruchom z konkretnym selektorem reguł
+sf code-analyzer run --rule-selector Security --workspace force-app
+
+# Eksport do różnych formatów
+sf code-analyzer run --workspace force-app --output-file results.html
+sf code-analyzer run --workspace force-app --output-file results.sarif
+```

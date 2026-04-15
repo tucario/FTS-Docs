@@ -1,0 +1,213 @@
+---
+title: AppExchangeリリース
+description: パッケージをビルドし、スキャンし、AppExchangeに送信するためのステップバイステップガイド。
+---
+
+import { Aside, Steps } from '@astrojs/starlight/components';
+
+## フェーズ1：プリフライト（ローカル）
+
+組織に触れる前にこれらを実行します。発生するすべてを修正します。
+
+### 1.1 Salesforce Code Analyzer v5 — 完全スキャン
+
+```bash
+# インストール（1回）
+sf plugins install @salesforce/plugin-code-analyzer
+
+# すべてのルールを実行（PMD、ESLint、RetireJS、Regex、Flow、CPD）
+sf code-analyzer run \
+  --workspace force-app \
+  --output-file docs/scan-results.html
+
+# AppExchange固有のルールを実行
+sf code-analyzer run \
+  --rule-selector AppExchange \
+  --workspace force-app \
+  --output-file docs/scan-appexchange.html
+
+# Security タグ付きルールのみを実行
+sf code-analyzer run \
+  --rule-selector Security \
+  --workspace force-app \
+  --output-file docs/scan-security.html
+
+# 重大度閾値 — HighまたはCriticalで失敗（CI/CD）
+sf code-analyzer run \
+  --rule-selector AppExchange \
+  --workspace force-app \
+  --severity-threshold 2 \
+  --output-file docs/scan-appexchange.html
+```
+
+**ゼロトレランス：** Critical（1）とHigh（2）。
+Medium（3）以下 — `docs/FALSE-POSITIVES.md`に誤検出として文書化します。
+
+### 1.2 ESLint（LWC）
+
+```bash
+npm run lint
+```
+
+### 1.3 LWC Jestテスト
+
+```bash
+npm run test:unit
+```
+
+## フェーズ2：組織テストとカバレッジ
+
+### 2.1 すべてのApexテストを実行
+
+```bash
+sf apex run test \
+  --code-coverage \
+  --result-format human \
+  --wait 10 \
+  --target-org FlexiFREE
+```
+
+**必須：** >= 75%の全体カバレッジ、すべてのトリガーにカバレッジが必要。
+
+### 2.2 クラスごとのカバレッジを確認
+
+```bash
+sf apex run test \
+  --code-coverage \
+  --result-format json \
+  --wait 10 \
+  --target-org FlexiFREE \
+  | jq '.result.coverage.coverage[]
+        | select(.coveredPercent < 75)
+        | {name, coveredPercent}'
+```
+
+## フェーズ3：パッケージバージョンをビルド（beta）
+
+### 3.1 sfdx-project.jsonでバージョンをバンプ
+
+```json
+"versionName": "ver 1.2.0",
+"versionNumber": "1.2.0.NEXT"
+```
+
+### 3.2 betaパッケージバージョンを作成
+
+```bash
+sf package version create \
+  --package FlexibleTeamShare \
+  --definition-file config/package-scratch-def.json \
+  --installation-key-bypass \
+  --wait 30 \
+  --code-coverage \
+  --skip-ancestor-check
+```
+
+### 3.3 検証とカバレッジ確認
+
+```bash
+sf package version list --packages FlexibleTeamShare --order-by CreatedDate --verbose
+sf package version report --package 04tXXXXXXXXXXXXXXX --verbose
+```
+
+## フェーズ4：インストールをテスト
+
+### 4.1 クリーンなスクラッチ/サンドボックス組織にインストール
+
+```bash
+sf package install \
+  --package 04tXXXXXXXXXXXXXXX \
+  --target-org TestOrg \
+  --wait 10
+```
+
+### 4.2 スモークテスト
+
+- `FTS_App_Access`と`FTS_Data_Access` Permission Setを割り当て
+- Wizardを介して共有設定を構成
+- レコード上でチームメンバーを追加/編集/削除
+- 共有レコードが作成/削除されることを確認
+- 非管理者ユーザーとしてテスト（FTS_Data_Accessのみ）
+
+## フェーズ5：Releaseにプロモート
+
+<Aside type="caution">
+これは**元に戻せません** — プロモートされたバージョンは削除できません。
+</Aside>
+
+```bash
+sf package version promote --package 04tXXXXXXXXXXXXXXX
+```
+
+## フェーズ6：Partner Security Portal — Source Scanner（Checkmarx）
+
+これはSalesforceパッケージを含むすべての送信に対して**必須**です。
+
+<Steps>
+1. DevHub/パッケージング組織の認証情報を使用して[Partner Security Portal](https://security.my.salesforce-sites.com/sourcescanner)にアクセス
+2. **プロモートされた**（リリース済み）パッケージバージョンを選択
+3. **Start Scan**をクリックして結果を待つ（通常15〜30分）
+4. レポートをダウンロード
+</Steps>
+
+<Aside type="tip">
+レビューごとに**3回の無料スキャン**を取得します。betaバージョンで無駄にしないでください。
+</Aside>
+
+### 検出結果の処理
+
+- **Critical/High** — コードを修正、再ビルド、再スキャン
+- **誤検出** — `docs/FALSE-POSITIVES.md`に文書化し、送信に添付
+- **Low/Info** — 根拠を文書化、修正不要
+
+## フェーズ7：DASTスキャン（該当する場合）
+
+Flexible Team Shareには**外部コールアウト、Web UI、APIエンドポイントがありません** — DASTは**該当しません**。
+
+## フェーズ8：送信資料の準備
+
+### 必須ドキュメント
+
+| 資料 | ファイル | 注記 |
+|----------|------|-------|
+| Code Analyzerレポート（完全） | `docs/scan-results.html` | フェーズ1から |
+| Code Analyzerレポート（AppExchange） | `docs/scan-appexchange.html` | フェーズ1から |
+| Source Scannerレポート | ポータルからダウンロード | フェーズ6から |
+| 誤検出ドキュメント | `docs/FALSE-POSITIVES.md` | 各検出結果を説明 |
+| 管理者/ユーザードキュメント | `docs/APPLICATION-OVERVIEW.md`、`docs/USE-CASES.md` | レビュー担当者がアプリをテスト |
+| インストールガイド | `docs/1. Installation Guide.md` | ステップバイステップのセットアップ |
+
+### レビュー組織の準備
+
+- **プロモートされた**パッケージバージョンをインストール
+- **MFA/2FAを無効化**してレビューチームがログインできるようにする
+- このレビューに関連するパッケージのみをインストール
+- レビューチーム用の完全なアクセス権を持つテストユーザーを作成
+- サンプルデータを含む少なくとも1つの動作する共有設定を事前に構成
+
+## フェーズ9：送信
+
+<Steps>
+1. **AppExchange Partner Console** > Publishing > Security Reviewに移動
+2. パッケージとプロモートされたバージョンを選択
+3. すべてのスキャンレポートをアップロード
+4. レビューチーム用の組織ログイン認証情報を提供
+5. $999の料金を支払う（有料アプリの場合；無料アプリ — 料金なし）
+6. 送信
+</Steps>
+
+**タイムライン：** 4〜6週間。ほとんどのアプリは2回目の試行で合格します。
+
+## 実行順序サマリー
+
+```
+フェーズ1  Code Analyzer + ESLint + Jest     ← コードの問題を修正
+フェーズ2  組織でApexテスト（>= 75%）        ← カバレッジギャップを修正
+フェーズ3  betaパッケージバージョンをビルド        ← ビルド失敗の場合、フェーズ2に戻る
+フェーズ4  クリーンな組織にインストールしてスモークテスト ← 壊れている場合、修正して再ビルド
+フェーズ5  releaseにプロモート                ← 元に戻せません
+フェーズ6  Source Scanner（Checkmarx）        ← プロモートされたバージョンのみ
+フェーズ7  DASTスキャン（該当する場合）         ← このアプリには該当しません
+フェーズ8  ドキュメントとレビュー組織を準備         ← すべてをパッケージ化
+フェーズ9  AppExchangeに送信             ← 4〜6週間待つ
+```

@@ -1,0 +1,121 @@
+---
+title: Rapport de scan de sécurité
+description: Résultats de l'analyse de code statique et meilleures pratiques de sécurité.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+## Outils de scan utilisés
+
+| Outil | Version | Objectif |
+|------|---------|---------|
+| Salesforce Code Analyzer v5 | Latest | Analyse de sécurité Apex/LWC |
+| PMD (incl. règles AppExchange) | v5 | Qualité du code et sécurité |
+| ESLint | v5 | Analyse JavaScript/LWC |
+| RetireJS | v5 | Bibliothèques JS vulnérables |
+| Partner Security Portal (Checkmarx) | Latest | Scan de source obligatoire |
+
+## Comment générer des rapports de scan
+
+### Prérequis
+
+```bash
+# Installer Salesforce CLI
+npm install -g @salesforce/cli
+
+# Installer le plugin Code Analyzer v5
+sf plugins install @salesforce/plugin-code-analyzer
+```
+
+### Exécuter un scan complet
+
+```bash
+# Exécuter toutes les règles avec sortie HTML
+sf code-analyzer run --workspace force-app --output-file docs/scan-results.html
+
+# Exécuter les règles spécifiques à AppExchange
+sf code-analyzer run --rule-selector AppExchange --workspace force-app --output-file docs/scan-appexchange.html
+
+# Exécuter uniquement les règles étiquetées Security
+sf code-analyzer run --rule-selector Security --workspace force-app --output-file docs/scan-security.html
+
+# Échouer sur High ou Critical (CI/CD)
+sf code-analyzer run --rule-selector AppExchange --workspace force-app --severity-threshold 2 --output-file docs/scan-appexchange.html
+```
+
+## Meilleures pratiques de sécurité implémentées
+
+### Application CRUD/FLS
+
+- Vérification `isCreateable()` avant INSERT
+- Vérification `isUpdateable()` avant UPDATE
+- Vérification `isDeletable()` avant DELETE
+- Permissions au niveau des champs via les ensembles de permissions
+
+### Prévention de l'injection SOQL
+
+- Variables liées utilisées pour l'entrée utilisateur
+- `String.escapeSingleQuotes()` pour les requêtes dynamiques
+- Noms d'objets dérivés des ID Salesforce (pas d'entrée utilisateur)
+
+### Conformité du modèle de partage
+
+- `with sharing` sur les contrôleurs principaux
+- `without sharing` uniquement là où documenté et nécessaire
+- Les enregistrements de partage respectent les paramètres OWD
+
+### Sécurité LWC
+
+- Pas d'`eval()` ou d'exécution de script dynamique
+- Entrée utilisateur assainie avant affichage
+- Pas d'identifiants codés en dur
+
+## Sécurité de l'intégration externe
+
+| Vérification | Statut | Notes |
+|-------|--------|-------|
+| HTTP Callouts | N/A | Le package ne fait aucun appel externe |
+| Named Credentials | N/A | Non utilisé |
+| External Objects | N/A | Non utilisé |
+| Remote Site Settings | N/A | Non requis |
+| Violations CSP | Réussite | Aucune violation Content-Security-Policy |
+
+## Couverture des tests Apex
+
+| Classe | Couverture | Statut |
+|-------|----------|--------|
+| ObjectTeamMemberController | >75% | Réussite |
+| TeamMemberWizardController | >75% | Réussite |
+| ShareRecordQueueable | >75% | Réussite |
+| SharingRecalculationBatch | >75% | Réussite |
+| ExpiredTeamMemberCleanupBatch | >75% | Réussite |
+| ObjectTeamMemberTriggerHandler | >75% | Réussite |
+| PostInstallHandler | >75% | Réussite |
+| **Global** | **>75%** | **Réussite** |
+
+### Comment exécuter les tests avec couverture
+
+```bash
+# Exécuter tous les tests avec couverture
+sf apex run test --code-coverage --result-format human --target-org [ORG_ALIAS]
+
+# Exécuter une classe de test spécifique
+sf apex run test --tests ObjectTeamMemberTest --code-coverage --result-format human --target-org [ORG_ALIAS]
+```
+
+## Référence des commandes du scanner (Code Analyzer v5)
+
+```bash
+# Lister les règles disponibles
+sf code-analyzer rules
+
+# Lister uniquement les règles AppExchange
+sf code-analyzer rules --rule-selector AppExchange
+
+# Exécuter avec un sélecteur de règle spécifique
+sf code-analyzer run --rule-selector Security --workspace force-app
+
+# Exporter vers différents formats
+sf code-analyzer run --workspace force-app --output-file results.html
+sf code-analyzer run --workspace force-app --output-file results.sarif
+```

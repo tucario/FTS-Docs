@@ -1,0 +1,77 @@
+---
+title: "v1.0"
+description: Flexible Team Share v1.0 Release Notes — Erste Veröffentlichung.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+**Veröffentlichungsdatum:** Februar 2026
+
+Dies ist die erste Veröffentlichung von Flexible Team Share, einem Salesforce Managed Package, das die native Account Team Member-Funktionalität erweitert, um mit jedem Salesforce-Objekt zu funktionieren.
+
+## Funktionen
+
+### Universelle Teammitgliedschaft
+
+Fügen Sie Teammitglieder zu jedem Salesforce-Objekt hinzu — nicht nur zu Accounts. Erstellen Sie kollaborative Teams bei Datensätzen über Standard- und benutzerdefinierte Objekte mit automatischer Datensatzfreigabe basierend auf Teammitgliedschaft.
+
+**Unterstützte Standardobjekte:** Account, Contact, Case, Lead, Opportunity, Campaign, Order
+
+**Benutzerdefinierte Objekte:** Jedes benutzerdefinierte Objekt mit Private oder Public Read Only OWD wird unterstützt.
+
+### Automatische Datensatzfreigabe
+
+Wenn ein Teammitglied hinzugefügt wird, werden automatisch Freigabedatensätze erstellt, um dem Benutzer angemessenen Zugriff auf den übergeordneten Datensatz zu gewähren. Freigaben werden aktualisiert, wenn sich Zugriffsebenen ändern, und entfernt, wenn Teammitglieder gelöscht werden. Alle Freigabeoperationen laufen asynchron über Queueable Apex für Skalierbarkeit.
+
+### Rollenbasierte Zugriffskontrolle
+
+Drei Teammitgliederrollen mit unterschiedlichen Fähigkeiten:
+
+| Rolle | Beschreibung |
+|------|-------------|
+| **Owner** | Automatisch dem Datensatzbesitzer zugewiesen. Voller Team-Management-Zugriff. |
+| **Manager** | Kann Teammitglieder hinzufügen, bearbeiten und entfernen. Delegiert Team-Management. |
+| **User** | Kann Teammitglieder anzeigen, aber das Team nicht ändern. Lese-/Bearbeitungszugriff auf den Datensatz. |
+
+### Temporäre Teamzuweisungen
+
+Setzen Sie ein **Enddatum** für Teammitglieder für zeitlich begrenzten Zugriff. Ein geplanter Batch-Job läuft täglich, um abgelaufene Mitgliedschaften zu bereinigen und Zugriff automatisch zu widerrufen.
+
+### Owner-Änderungs-Synchronisierung
+
+Die `SyncOwnerInvocable` Invocable Action hält den Team-Owner synchron, wenn sich der Owner des übergeordneten Datensatzes ändert. Aufrufbar aus Flow oder Apex, vollständig bulkifiziert. Unterstützt alle konfigurierten Objekte.
+
+### Configuration Wizard
+
+Admin-UI zur Aktivierung der Team-Freigabe auf Objektbasis. Konfigurationen aktiv/inaktiv schalten, Bereinigungsjobs planen und Objekteinstellungen verwalten — alles über eine Schnittstelle.
+
+### Anpassbare Komponente
+
+Die Object Team Member LWC-Komponente ist im Lightning App Builder konfigurierbar:
+
+- **Card Title** — benutzerdefinierter Titel für die Komponentenkarte
+- **Max Displayed Members** — einklappbare Liste mit konfigurierbarem Limit (Standard: 5)
+
+### Internationalisierung
+
+35 Sprachen unterstützt über Custom Labels und Translation Workbench.
+
+## Permission Sets
+
+| Permission Set | Zielgruppe | Beschreibung |
+|---------------|----------|-------------|
+| **FTS_App_Access** | Administratoren | Vollständiger Admin-Zugriff — App, Tabs, alle Apex-Klassen, vollständiges CRUD + MAR |
+| **FTS_Data_Access** | Endbenutzer | Benutzerzugriff — Basis-CRUD auf Teammitgliedern, Controller-Apex-Klassen |
+
+## Anforderungen
+
+- Salesforce **Enterprise Edition** oder höher
+- Objekte müssen **Private** oder **Public Read Only** OWD haben
+- **Namespace:** `tucariofts`
+- **API-Version:** 65.0
+
+## Bekannte Einschränkungen
+
+- Owner-Synchronisierung erfordert einen Record-Triggered Flow pro Objekt (Managed Packages können keine Trigger auf Standardobjekten enthalten)
+- Queue-Owner werden nicht als Teammitglieder unterstützt (verwendet stattdessen laufenden Benutzer)
+- Maximales Teammitgliederlimit wird pro Objektkonfiguration durchgesetzt

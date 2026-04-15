@@ -1,0 +1,59 @@
+---
+title: Vue d'ensemble des cas d'utilisation
+description: Personas utilisateur et scénarios de test pour Flexible Team Share.
+---
+
+Cette section décrit les principaux parcours utilisateur et les fonctionnalités clés de Flexible Team Share. Elle sert de guide aux réviseurs pendant les tests de l'application.
+
+## Personas utilisateur
+
+| Persona | Profil | Permissions |
+|---------|---------|------------|
+| **Admin** | System Administrator | FTS_App_Access + FTS_Data_Access |
+| **Manager** | Sales Manager / Team Lead | FTS_Data_Access |
+| **User** | Standard User | FTS_Data_Access |
+
+## Carte des cas d'utilisation
+
+| Catégorie | Cas d'utilisation | Persona |
+|----------|-----------|---------|
+| [Configuration initiale](/fr/use-cases/initial-setup/) | Configuration d'objet, configuration de composant, tâches planifiées, configuration d'affichage | Admin |
+| [Gérer l'équipe](/fr/use-cases/manage-team/) | Ajouter, modifier, supprimer des membres d'équipe, voir l'équipe, accès temporaire, synchronisation du propriétaire | Manager, User |
+| [Tâches administratives](/fr/use-cases/admin-tasks/) | Vérification des permissions, désactivation, nettoyage manuel | Admin |
+
+## Résumé de la liste de vérification des tests
+
+### Tests fonctionnels
+
+- [ ] Ajouter un membre d'équipe (tous les niveaux d'accès)
+- [ ] Modifier un membre d'équipe (changer l'accès, le rôle, la date de fin)
+- [ ] Supprimer un membre d'équipe
+- [ ] Voir les membres d'équipe en tant que Manager
+- [ ] Voir les membres d'équipe en tant que User (lecture seule)
+- [ ] Configuration d'objet (ajouter/modifier/supprimer)
+- [ ] Gestion des tâches planifiées
+- [ ] Exécution manuelle du nettoyage
+
+### Tests de sécurité
+
+- [ ] Aucun accès sans ensemble de permissions
+- [ ] Les utilisateurs ne peuvent pas modifier les équipes des autres (sauf Manager)
+- [ ] Enregistrements de partage créés avec le niveau d'accès correct
+- [ ] Enregistrements de partage supprimés lorsque le membre est supprimé
+- [ ] Règles de validation appliquées (date de fin)
+
+### Tests de configuration UI
+
+- [ ] Titre de carte personnalisé affiché correctement
+- [ ] Limite d'affichage (Max Displayed Members) respectée
+- [ ] Bascule "Show X more" / "Show less" fonctionne
+- [ ] Limite = 0 affiche tous les membres
+- [ ] Le propriétaire toujours en premier dans la vue réduite
+
+### Cas limites
+
+- [ ] Rejet de membre d'équipe en double
+- [ ] Rejet de date de fin passée
+- [ ] Limite maximale atteinte
+- [ ] Avertissement d'objet non configuré
+- [ ] Utilisateur non trouvé dans la recherche

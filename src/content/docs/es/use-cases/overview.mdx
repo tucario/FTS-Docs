@@ -1,0 +1,59 @@
+---
+title: Descripción General de Casos de Uso
+description: Personas de usuario y escenarios de prueba para Flexible Team Share.
+---
+
+Esta sección describe las rutas principales de usuario y las características clave de Flexible Team Share. Sirve como guía para revisores durante las pruebas de la aplicación.
+
+## Personas de Usuario
+
+| Persona | Perfil | Permisos |
+|---------|---------|------------|
+| **Admin** | System Administrator | FTS_App_Access + FTS_Data_Access |
+| **Manager** | Sales Manager / Team Lead | FTS_Data_Access |
+| **User** | Standard User | FTS_Data_Access |
+
+## Mapa de Casos de Uso
+
+| Categoría | Casos de Uso | Persona |
+|----------|-----------|---------|
+| [Configuración Inicial](/es/use-cases/initial-setup/) | Configuración de objetos, configuración de componentes, trabajos programados, configuración de visualización | Admin |
+| [Gestionar Equipo](/es/use-cases/manage-team/) | Agregar, editar, eliminar miembros del equipo, ver equipo, acceso temporal, sincronización de propietario | Manager, User |
+| [Tareas de Administrador](/es/use-cases/admin-tasks/) | Verificación de permisos, desactivación, limpieza manual | Admin |
+
+## Resumen de Lista de Verificación de Pruebas
+
+### Pruebas Funcionales
+
+- [ ] Agregar miembro del equipo (todos los niveles de acceso)
+- [ ] Editar miembro del equipo (cambiar acceso, rol, fecha de finalización)
+- [ ] Eliminar miembro del equipo
+- [ ] Ver miembros del equipo como Manager
+- [ ] Ver miembros del equipo como User (solo lectura)
+- [ ] Configuración de objeto (agregar/editar/eliminar)
+- [ ] Gestión de trabajos programados
+- [ ] Ejecución de limpieza manual
+
+### Pruebas de Seguridad
+
+- [ ] Sin acceso sin Permission Set
+- [ ] Los usuarios no pueden editar equipos de otros (a menos que sean Manager)
+- [ ] Los registros compartidos se crean con el nivel de acceso correcto
+- [ ] Los registros compartidos se eliminan cuando se elimina el miembro
+- [ ] Las reglas de validación se aplican (fecha de finalización)
+
+### Pruebas de Configuración de UI
+
+- [ ] El título de tarjeta personalizado se muestra correctamente
+- [ ] Se respeta el límite de visualización (Max Displayed Members)
+- [ ] El botón "Show X more" / "Show less" funciona
+- [ ] Límite = 0 muestra todos los miembros
+- [ ] El propietario siempre está primero en la vista contraída
+
+### Casos Extremos
+
+- [ ] Rechazo de miembro del equipo duplicado
+- [ ] Rechazo de fecha de finalización pasada
+- [ ] Límite máximo alcanzado
+- [ ] Advertencia de objeto no configurado
+- [ ] Usuario no encontrado en búsqueda

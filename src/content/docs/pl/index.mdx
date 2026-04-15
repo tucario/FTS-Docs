@@ -1,0 +1,52 @@
+---
+title: Flexible Team Share
+description: Rozszerzenie funkcjonalności Account Team Member Salesforce na dowolny obiekt.
+template: splash
+hero:
+  tagline: Twórz zespoły współpracy, zarządzaj dostępami i automatyzuj udostępnianie — wszystko w ramach platformy Salesforce.
+  image:
+    file: ../../../assets/logo.png
+  actions:
+    - text: Rozpocznij
+      link: /docs/pl/getting-started/installation/
+      icon: right-arrow
+      variant: primary
+    - text: Zobacz architekturę
+      link: /docs/pl/architecture/overview/
+      icon: seti:config
+---
+
+import { LinkCard, CardGrid } from '@astrojs/starlight/components';
+
+## Kluczowe funkcje
+
+<CardGrid>
+	<LinkCard title="Uniwersalne członkostwo zespołu" href="/docs/pl/getting-started/installation/" description="Dodawaj członków zespołu do dowolnego obiektu, nie tylko do kont. Obsługuje obiekty standardowe i niestandardowe z OWD typu Private lub Public Read Only." />
+	<LinkCard title="Automatyczne udostępnianie rekordów" href="/docs/pl/architecture/sharing-model/" description="Członkowie zespołu automatycznie otrzymują odpowiedni dostęp. Rekordy udostępnień są tworzone, aktualizowane i usuwane automatycznie." />
+	<LinkCard title="Dostęp oparty na rolach" href="/docs/pl/architecture/security/" description="Role Owner, Manager i User z odrębnymi uprawnieniami. Menedżerowie mogą dodawać, edytować i usuwać członków zespołu." />
+	<LinkCard title="Przypisania czasowe" href="/docs/pl/getting-started/configuration/#temporary-access-with-end-date" description="Członkostwo w zespole z ograniczeniem czasowym z automatycznym czyszczeniem. Ustaw datę końcową, a wygasłe członkostwa zostaną usunięte automatycznie." />
+</CardGrid>
+
+## Obsługiwane obiekty
+
+- **Obiekty standardowe**: Account, Contact, Case, Lead, Opportunity, Campaign, Order
+- **Obiekty niestandardowe**: Dowolny obiekt niestandardowy z OWD typu Private lub Public Read Only
+
+## Szybki start
+
+1. **Zainstaluj** pakiet z AppExchange
+2. **Przypisz** Permission Sets (FTS_App_Access dla administratorów, FTS_Data_Access dla użytkowników)
+3. **Skonfiguruj** obiekty za pomocą Configuration Wizard
+4. **Dodaj** komponent Team Member do stron rekordów
+
+Gotowy, aby rozpocząć? Przejdź do [Przewodnika instalacji](/pl/getting-started/installation/).
+
+## Informacje o pakiecie
+
+| Właściwość | Wartość |
+|----------|-------|
+| **Namespace** | `tucariofts` |
+| **Wydawca** | Tucario |
+| **API Version** | 65.0 |
+| **Typ pakietu** | 2GP Managed Package |
+| **Wsparcie** | hello@tucario.com |

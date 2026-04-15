@@ -1,0 +1,263 @@
+---
+title: Konfiguracja
+description: Konfiguracja komponentów Flexible Team Share, synchronizacji właściciela i zaplanowanych zadań.
+---
+
+import { Aside, Steps } from '@astrojs/starlight/components';
+
+## Konfiguracja komponentu
+
+Komponent Object Team Member można skonfigurować bezpośrednio w Lightning App Builder za pomocą następujących właściwości:
+
+| Właściwość | Typ | Domyślnie | Opis |
+|----------|------|---------|-------------|
+| **Card Title** | String | Team Members | Tytuł wyświetlany na karcie komponentu |
+| **Max Displayed Members** | Integer | 5 | Maksymalna liczba członków zespołu wyświetlanych przed zwinięciem. Ustaw na 0, aby wyświetlić wszystkich |
+
+Gdy liczba członków zespołu przekroczy skonfigurowany limit, lista jest zwijana i wyświetla przycisk **"Show all (X more)"**. Kliknięcie go rozwija pełną listę, z przyciskiem **"Show less"**, aby zwinąć ją ponownie. Właściciel rekordu zawsze pojawia się jako pierwszy na liście, niezależnie od limitu wyświetlania.
+
+![Zwinięta lista członków zespołu](../../../../assets/pictures/team-members-collapsed.png)
+
+![Lightning App Builder — właściwości komponentu](../../../../assets/pictures/app-builder-config.png)
+
+### Zachowanie limitu wyświetlania
+
+| Ustawienie | Zachowanie |
+|---------|----------|
+| Max Displayed Members = **5** (domyślnie) | Pokazuje pierwszych 5 członków, "Show X more" dla pozostałych |
+| Max Displayed Members = **0** | Wszyscy członkowie zespołu widoczni, bez zwijania/rozwijania |
+| Max Displayed Members = **3** (niestandardowe) | Pokazuje pierwszych 3 członków, "Show X more" dla pozostałych |
+
+## Role członków zespołu
+
+Dodając użytkowników do zespołu, przypisujesz im jedną z następujących ról:
+
+| Rola | Opis | Możliwości |
+|------|-------------|-------------|
+| **Owner** | Właściciel rekordu | Automatycznie przypisywana przy tworzeniu rekordu. Nie można jej ręcznie przypisać ani usunąć. Ma pełny dostęp do zarządzania członkami zespołu. Usuwana automatycznie, gdy w zespole nie ma innych użytkowników. |
+| **Manager** | Administrator zespołu | Może dodawać, edytować i usuwać członków zespołu. Użyj tej roli dla użytkowników, którzy muszą zarządzać składem zespołu. |
+| **User** | Standardowy członek zespołu | Może przeglądać listę członków zespołu, ale nie może jej modyfikować. Użyj tej roli dla użytkowników, którzy potrzebują tylko dostępu do rekordu. |
+
+![Komponent Team Members pokazujący role](../../../../assets/pictures/team-members-expanded.png)
+
+<Aside type="note">
+- Rola **Owner** jest automatycznie tworzona przez system i reprezentuje aktualnego właściciela rekordu
+- Zarówno role **Manager**, jak i **User** otrzymują dostęp do rekordu na podstawie przypisanego poziomu dostępu (Read Only lub Read/Write)
+- Tylko użytkownicy z rolami **Owner** lub **Manager** mogą dodawać, edytować lub usuwać członków zespołu
+</Aside>
+
+## Synchronizacja zmiany właściciela
+
+Gdy właściciel rekordu się zmienia (np. konto jest przypisane do innego przedstawiciela handlowego), członek zespołu Owner **NIE jest automatycznie aktualizowany**. System tworzy rekord Owner, gdy dodawany jest pierwszy członek zespołu, ale nie śledzi późniejszych zmian właściciela w rekordzie nadrzędnym.
+
+Aby synchronizować właściciela zespołu z właścicielem rekordu, należy utworzyć **Record-Triggered Flow**.
+
+<Aside type="note" title="Dlaczego nie jest to automatyczne?">
+Pakiety zarządzane Salesforce nie mogą zawierać triggerów dla obiektów standardowych, takich jak Account czy Opportunity. Flexible Team Share udostępnia **Invocable Action**, którą można wywołać z Flow, aby zsynchronizować właściciela w razie potrzeby.
+</Aside>
+
+### Konfiguracja za pomocą Flow (zalecane)
+
+<Steps>
+1. Przejdź do **Setup** > **Flows**
+2. Kliknij **New Flow** > **Record-Triggered Flow**
+3. Wybierz obiekt (np. Account)
+4. Skonfiguruj trigger: **"A record is updated"**
+5. Dodaj warunek wejścia: Formula > `ISCHANGED({!$Record.OwnerId})` jest równe `true`
+6. Ustaw **"When to Run the Flow"** na **"After the record is saved"**
+7. Dodaj element **Action**
+8. Wyszukaj **"Sync Team Member Owner"**
+9. Ustaw parametr **"Record ID"** na `{!$Record.Id}`
+10. Pozostaw **"Object API Name"** puste (automatycznie wyprowadzane z Record ID)
+11. Zapisz i **aktywuj** Flow
+</Steps>
+
+![Flow Builder - Flow synchronizacji właściciela](../../../../assets/pictures/flow-builder-owner-sync.png)
+![Konfiguracja akcji Sync Team Member Owner](../../../../assets/pictures/sync-owner-action-config.png)
+
+<Aside type="tip">
+Powtórz te kroki dla każdego obiektu, dla którego chcesz automatycznej synchronizacji właściciela (np. Account, Opportunity, Case, Lead).
+</Aside>
+
+### Konfiguracja za pomocą triggera Apex
+
+```apex
+trigger AccountOwnerSync on Account(after update) {
+  List<tucariofts.SyncOwnerInvocable.SyncOwnerRequest> requests =
+    new List<tucariofts.SyncOwnerInvocable.SyncOwnerRequest>();
+
+  for (Account acc : Trigger.new) {
+    Account oldAcc = Trigger.oldMap.get(acc.Id);
+    if (acc.OwnerId != oldAcc.OwnerId) {
+      tucariofts.SyncOwnerInvocable.SyncOwnerRequest req =
+        new tucariofts.SyncOwnerInvocable.SyncOwnerRequest();
+      req.recordId = acc.Id;
+      requests.add(req);
+    }
+  }
+
+  if (!requests.isEmpty()) {
+    tucariofts.SyncOwnerInvocable.syncOwners(requests);
+  }
+}
+```
+
+### Wywołanie z kodu Apex (pojedynczy rekord)
+
+```apex
+tucariofts.SyncOwnerInvocable.SyncOwnerRequest request =
+    new tucariofts.SyncOwnerInvocable.SyncOwnerRequest();
+request.recordId = accountId;
+
+List<tucariofts.SyncOwnerInvocable.SyncOwnerResult> results =
+    tucariofts.SyncOwnerInvocable.syncOwners(
+        new List<tucariofts.SyncOwnerInvocable.SyncOwnerRequest>{ request }
+    );
+
+if (results[0].success) {
+    System.debug('Owner synced: ' + results[0].oldOwnerId +
+                 ' → ' + results[0].newOwnerId);
+} else {
+    System.debug('Sync failed: ' + results[0].message);
+}
+```
+
+### Obiekt wyniku
+
+| Pole | Typ | Opis |
+|-------|------|-------------|
+| `success` | Boolean | Czy synchronizacja się powiodła |
+| `message` | String | Komunikat wyniku lub szczegóły błędu |
+| `oldOwnerId` | Id | Poprzedni User ID właściciela |
+| `newOwnerId` | Id | Nowy User ID właściciela |
+
+### Scenariusze błędów
+
+| Scenariusz | Wynik |
+|----------|--------|
+| Brak członków zespołu w rekordzie | `success = false`, "No Owner team member found" |
+| Właściciel bez zmian | `success = true`, "Owner unchanged, no update needed" |
+| Record ID null | `success = false`, "Record ID is required" |
+| Nieprawidłowy record ID | `success = false`, komunikat błędu |
+
+### Ważne ograniczenia
+
+**Właściciele w postaci kolejek nie są obsługiwani** — Flexible Team Share nie obsługuje kolejek jako właścicieli zespołów. Gdy rekord jest własnością kolejki:
+
+- System używa **bieżącego użytkownika** (osoby, która jako pierwsza dodaje członka zespołu) jako właściciela w zespole
+- Jeśli później zmienisz właściciela rekordu z kolejki na użytkownika, uruchom akcję Sync Owner, aby zaktualizować zespół
+- Jeśli zmienisz właściciela z użytkownika na kolejkę, właściciel zespołu pozostanie jako poprzedni użytkownik
+
+**Flow musi być utworzony dla każdego obiektu** — należy utworzyć oddzielny Record-Triggered Flow dla każdego typu obiektu, dla którego chcesz synchronizacji właściciela. Invocable Action działa z dowolnym obiektem, ale Salesforce wymaga oddzielnych Record-Triggered Flows dla każdego obiektu.
+
+## Dostęp czasowy z datą końcową
+
+Dodając członka zespołu, możesz opcjonalnie ustawić **datę końcową**, aby przyznać tymczasowy dostęp do rekordu. Jest to przydatne w przypadku:
+
+- Współpracy projektowej z określonymi ramami czasowymi
+- Konsultantów lub wykonawców tymczasowych
+- Pokrycia urlopu lub delegowania odpowiedzialności
+- Okresów audytu lub przeglądu
+
+### Jak to działa
+
+<Steps>
+1. Dodając lub edytując członka zespołu, ustaw pole **End Date** na ostatni dzień, w którym powinien mieć dostęp
+2. Członek zespołu zachowuje pełny dostęp do końca tego dnia
+3. Po upływie daty końcowej zaplanowane zadanie czyszczenia automatycznie usuwa członka zespołu i cofa jego dostęp
+</Steps>
+
+![Członek zespołu z datą końcową](../../../../assets/pictures/team-members-end-date.png)
+
+### Proces automatycznego czyszczenia
+
+- Zaplanowane zadanie wsadowe uruchamia się codziennie (domyślnie o 2:00) w celu usunięcia wygasłych członków zespołu
+- Gdy członek zespołu jest usuwany, jego rekord udostępnienia jest również usuwany, cofając dostęp do rekordu
+- Zadanie czyszczenia można zarządzać z Configuration Wizard
+
+![Zarządzanie zaplanowanym zadaniem](../../../../assets/pictures/install-guide-14.png)
+
+## Zaplanowane zadanie
+
+Flexible Team Share zawiera automatyczne zadanie czyszczenia, które usuwa wygasłych członków zespołu. To zadanie jest automatycznie planowane podczas instalacji pakietu.
+
+### Weryfikacja zadania
+
+<Steps>
+1. Przejdź do **Setup** > **Scheduled Jobs**
+2. Poszukaj **Flexible Team Share - Expired Member Cleanup**
+3. Zweryfikuj, że zadanie jest zaplanowane na codzienne uruchomienie
+</Steps>
+
+![Zaplanowane zadania w Setup](../../../../assets/pictures/install-guide-20.png)
+
+### Ręczne zarządzanie zadaniem
+
+Administratorzy mogą zarządzać zadaniem czyszczenia z Configuration Wizard:
+
+- **Schedule Job** — ręcznie zaplanuj, jeśli nie jest uruchomione
+- **Unschedule Job** — zatrzymaj automatyczne czyszczenie
+- **Run Now** — wykonaj czyszczenie natychmiast
+
+## Rozwiązywanie problemów
+
+### Ostrzeżenie "Configuration Not Found"
+
+**Objaw:** pojawia się okno ostrzegawcze informujące, że nie istnieje konfiguracja dla tego obiektu.
+
+**Przyczyna:** komponent Team Member został dodany do strony rekordu przed skonfigurowaniem obiektu w Configuration Wizard.
+
+**Rozwiązanie:**
+<Steps>
+1. Przejdź do Configuration Wizard (aplikacja Flexible Team Share > Configuration)
+2. Dodaj i wdróż konfigurację dla tego obiektu
+3. Wróć do strony rekordu — komponent powinien teraz działać poprawnie
+</Steps>
+
+![Ostrzeżenie Configuration Not Found](../../../../assets/pictures/install-guide-15.png)
+
+### Błąd "No Access"
+
+**Objaw:** komponent wyświetla komunikat "No Access" z ikoną kłódki zamiast członków zespołu.
+
+**Przyczyna:** bieżący użytkownik nie ma przypisanego wymaganego Permission Set Group.
+
+**Rozwiązanie:**
+<Steps>
+1. Przejdź do **Setup** > **Permission Set Groups**
+2. Przypisz **Admin** lub **User** Permission Set Group do użytkowników, których to dotyczy
+3. Użytkownicy mogą potrzebować wylogowania i ponownego zalogowania, aby zmiany weszły w życie
+</Steps>
+
+![Błąd No Access](../../../../assets/pictures/install-guide-16.png)
+
+### Ostrzeżenie "Limit Reached"
+
+**Objaw:** przycisk "Add Team Member" jest wyłączony i komunikat wskazuje, że osiągnięto limit.
+
+**Przyczyna:** osiągnięto maksymalną dozwoloną liczbę członków zespołu.
+
+**Rozwiązanie:** usuń nieaktywnych lub niepotrzebnych członków zespołu, aby zwolnić miejsca.
+
+| Członkowie zespołu w limicie | Członkowie zespołu poza limitem |
+|:-----|:-----|
+| ![W limicie](../../../../assets/pictures/install-guide-17.png) | ![Ponad limit](../../../../assets/pictures/install-guide-18.png) |
+
+![Szczegóły ostrzeżenia o osiągnięciu limitu](../../../../assets/pictures/install-guide-19.png)
+
+### Udostępnianie nie działa
+
+**Objaw:** członkowie zespołu są pomyślnie dodawani, ale nie mogą uzyskać dostępu do rekordu.
+
+**Przyczyna:** Organization-Wide Default (OWD) obiektu jest ustawione na Public Read/Write.
+
+**Rozwiązanie:**
+<Steps>
+1. Przejdź do **Setup** > **Sharing Settings**
+2. Zmień OWD obiektu na **Private** lub **Public Read Only**
+3. Uwaga: zmiana ustawień OWD może wpłynąć na dostęp innych użytkowników — skonsultuj się z administratorem Salesforce
+</Steps>
+
+## Wsparcie
+
+W przypadku pytań lub problemów prosimy o kontakt na adres [support@tucario.com](mailto:support@tucario.com).

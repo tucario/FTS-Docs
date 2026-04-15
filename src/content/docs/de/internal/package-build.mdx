@@ -1,0 +1,164 @@
+---
+title: Package Build
+description: Schnellreferenz für das Erstellen von FlexibleTeamShare-Paketversionen.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+## Voraussetzungen
+
+- Salesforce CLI installiert (`sf`)
+- Authentifizierung bei Dev Hub-Org
+- Arbeitsverzeichnis: Projektstamm
+
+## Beta-Paket
+
+### Neues Beta erstellen
+
+```bash
+sf package version create \
+  --package FlexibleTeamShare \
+  --definition-file config/package-scratch-def.json \
+  --installation-key-bypass \
+  --wait 30 \
+  --code-coverage \
+  --skip-ancestor-check
+```
+
+### Beta erstellen (mit Installationspasswort)
+
+```bash
+sf package version create \
+  --package FlexibleTeamShare \
+  --definition-file config/package-scratch-def.json \
+  --installation-key YOUR_PASSWORD \
+  --wait 30 \
+  --code-coverage \
+  --skip-ancestor-check
+```
+
+<Aside type="caution">
+Übergeben Sie immer explizit `--definition-file config/package-scratch-def.json`, um sicherzustellen, dass die Build-Org Translation Workbench aktiviert hat. Die Eigenschaft `definitionFile` in `sfdx-project.json` wird möglicherweise nicht immer zuverlässig übernommen.
+</Aside>
+
+## Release-Paket (Promoted)
+
+### Schritt 1: Vorhandene Versionen auflisten
+
+```bash
+sf package version list \
+  --packages FlexibleTeamShare \
+  --order-by CreatedDate \
+  --verbose
+```
+
+### Schritt 2: Beta zu Release promoten
+
+Ersetzen Sie `04t...` durch die tatsächliche Versions-ID aus Schritt 1:
+
+```bash
+sf package version promote --package 04tXXXXXXXXXXXXXXX
+```
+
+## Nützliche Befehle
+
+### Paketversionsdetails prüfen
+
+```bash
+sf package version list \
+  --packages FlexibleTeamShare \
+  --order-by CreatedDate \
+  --verbose
+```
+
+### Installations-URL abrufen
+
+```bash
+sf package version list \
+  --packages FlexibleTeamShare \
+  --order-by CreatedDate \
+  --verbose --json
+```
+
+Suchen Sie nach `SubscriberPackageVersionId` (beginnt mit `04t`).
+
+Installations-URL-Format:
+```
+https://login.salesforce.com/packaging/installPackage.apexp?p0=04tXXXXXXXXXXXXXXX
+```
+
+### Code-Coverage prüfen
+
+```bash
+sf package version report --package 04tXXXXXXXXXXXXXXX --verbose
+```
+
+### Fehlgeschlagene/unerwünschte Version löschen
+
+```bash
+sf package version delete --package 04tXXXXXXXXXXXXXXX --no-prompt
+```
+
+## Versionsnummerierung
+
+Konfiguriert in `sfdx-project.json`:
+
+| Feld | Beispiel | Beschreibung |
+|-------|---------|-------------|
+| `versionNumber` | `1.0.0.NEXT` | MAJOR.MINOR.PATCH.BUILD |
+| `NEXT` | auto | Inkrementiert Build-Nummer automatisch |
+
+### Version manuell erhöhen
+
+`sfdx-project.json` bearbeiten:
+
+```json
+"versionNumber": "1.1.0.NEXT"
+```
+
+## Häufige Probleme
+
+### "Ancestor version required"
+
+Flag `--skip-ancestor-check` hinzufügen oder Ancestor in `sfdx-project.json` setzen.
+
+### "Code coverage below 75%"
+
+Tests zuerst lokal ausführen:
+
+```bash
+sf apex run test --code-coverage --result-format human --wait 10
+```
+
+### "Translation languages not available"
+
+1. Sicherstellen, dass `definitionFile` in `sfdx-project.json` gesetzt ist
+2. Sicherstellen, dass `config/package-scratch-def.json` Enterprise Edition und alle drei Spracheinstellungen hat:
+
+```json
+{
+  "orgName": "Package Build Org",
+  "edition": "Enterprise",
+  "features": ["EnableSetPasswordInApi"],
+  "settings": {
+    "lightningExperienceSettings": {
+      "enableS1DesktopEnabled": true
+    },
+    "languageSettings": {
+      "enableTranslationWorkbench": true,
+      "enableEndUserLanguages": true,
+      "enablePlatformLanguages": true
+    }
+  }
+}
+```
+
+## Schnellreferenz
+
+| Aktion | Befehl |
+|--------|---------|
+| Beta erstellen | `sf package version create --package FlexibleTeamShare --definition-file config/package-scratch-def.json --installation-key-bypass --wait 30 --code-coverage --skip-ancestor-check` |
+| Versionen auflisten | `sf package version list --packages FlexibleTeamShare --order-by CreatedDate --verbose` |
+| Zu Release promoten | `sf package version promote --package 04tXXX...` |
+| Coverage prüfen | `sf package version report --package 04tXXX... --verbose` |
+| Version löschen | `sf package version delete --package 04tXXX... --no-prompt` |

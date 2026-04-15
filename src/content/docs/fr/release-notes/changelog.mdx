@@ -1,0 +1,27 @@
+---
+title: Changelog
+description: Changelog complet pour toutes les versions de Flexible Team Share.
+---
+
+Tous les changements notables apportés à Flexible Team Share sont documentés dans ce fichier.
+
+## v1.0 — 2026-02
+
+Version initiale de Flexible Team Share.
+
+### Ajouté
+
+- **Appartenance d'équipe universelle** — Ajoutez des membres d'équipe à n'importe quel objet Salesforce (standard et personnalisé)
+- **Partage automatique d'enregistrements** — Les enregistrements de partage sont créés/mis à jour/supprimés automatiquement en fonction de l'appartenance à l'équipe
+- **Accès basé sur les rôles** — Rôles propriétaire, gestionnaire et utilisateur avec des permissions distinctes
+- **Affectations temporaires** — Prise en charge de la date de fin avec nettoyage automatique via tâche batch planifiée
+- **Synchronisation du propriétaire** — Invocable Action (`SyncOwnerInvocable`) pour maintenir le propriétaire de l'équipe synchronisé lorsque le propriétaire de l'enregistrement parent change
+- **Assistant de configuration** — Interface utilisateur administrateur pour activer le partage d'équipe par objet
+- **Liste d'équipe réductible** — Limite d'affichage configurable avec bascule "Show more/less"
+- **Composant personnalisable** — Titre de carte et nombre maximal de membres affichés configurables dans Lightning App Builder
+- **Prise en charge multi-objets** — Account, Contact, Case, Lead, Opportunity, Campaign, Order et tout objet personnalisé
+- **Internationalisation** — 35 langues prises en charge via Custom Labels et Translation Workbench
+- **Ensembles de permissions** — FTS_App_Access (admin) et FTS_Data_Access (user)
+- **Sécurité** — Application CRUD/FLS, prévention de l'injection SOQL, conformité du modèle de partage
+
+Voir les [notes de version complètes v1.0](/fr/release-notes/1-0/) pour les détails.

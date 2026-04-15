@@ -1,0 +1,133 @@
+---
+title: Sharing Model
+description: How Flexible Team Share manages record sharing and access levels.
+slug: 1.0/architecture/sharing-model
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+## Sharing Architecture
+
+```mermaid
+flowchart TB
+    subgraph SHARING["SHARING ARCHITECTURE"]
+        subgraph OTM["ObjectTeamMember__c"]
+            OTM1["OWD: Private"]
+            OTM2["Sharing: Custom via ObjectTeamMember__Share"]
+            OTM3["RowCause: ManualAccess__c"]
+        end
+
+        subgraph TSC["Team_Sharing_Config__c"]
+            TSC1["OWD: Public Read Only"]
+            TSC2["All users can read, admins modify"]
+        end
+
+        subgraph PARENT["Parent Objects<br/>(Account, Case, etc.)"]
+            P1["Requires: Private or Public Read Only OWD"]
+            P2["Sharing: Via [Object]Share"]
+            P3["RowCause: Manual"]
+        end
+    end
+```
+
+## How Sharing Works
+
+### ObjectTeamMember\_\_c
+
+* **OWD**: Private
+* **Sharing mechanism**: Custom sharing via `ObjectTeamMember__Share`
+* **RowCause**: `ManualAccess__c`
+
+When a team member is added, the system creates an `ObjectTeamMember__Share` record so the team member can see their own team membership record.
+
+### Team\_Sharing\_Config\_\_c
+
+* **OWD**: Public Read Only
+* All users can read configuration (needed for component rendering)
+* Only administrators can modify configurations
+
+### Parent Objects
+
+* **Requirement**: Objects must have **Private** or **Public Read Only** OWD
+* **Sharing mechanism**: Via standard `[Object]Share` tables (e.g., `AccountShare`, `CaseShare`)
+* **RowCause**: Manual
+
+<Aside type="caution">
+  If the parent object's OWD is set to **Public Read/Write**, sharing records cannot grant additional access since users already have full access. Flexible Team Share requires Private or Public Read Only OWD to function properly.
+</Aside>
+
+## Access Level Mapping
+
+When a team member is added with an access level, it maps to Salesforce share record access:
+
+| ObjectTeamMember\_\_c Access\_Level\_\_c | \[Object]Share AccessLevel | Description |
+|-------------------------------------|--------------------------|-------------|
+| **Read Only** | `Read` | Team member can view the record |
+| **Read/Write** | `Edit` | Team member can view and edit the record |
+
+## Share Record Lifecycle
+
+### Creating Shares
+
+When a team member is added:
+
+1. `ObjectTeamMember__c` record is inserted
+2. Trigger fires and enqueues `ShareRecordQueueable`
+3. Queueable creates two share records:
+   * **Parent share**: `[Object]Share` record giving the user access to the parent record
+   * **Team member share**: `ObjectTeamMember__Share` record giving the user visibility of their team membership
+
+### Updating Shares
+
+When a team member's access level changes:
+
+1. `ObjectTeamMember__c` record is updated
+2. Trigger fires and enqueues `ShareRecordQueueable`
+3. Queueable deletes old share and creates new one with updated access level
+
+### Deleting Shares
+
+When a team member is removed:
+
+1. `ObjectTeamMember__c` record is deleted
+2. Trigger fires and enqueues `ShareRecordQueueable`
+3. Queueable deletes both share records (parent and team member)
+
+### Bulk Recalculation
+
+When a sharing configuration is toggled:
+
+* **Deactivated**: `SharingRecalculationBatch` removes all share records for that object
+* **Reactivated**: `SharingRecalculationBatch` recreates share records for all existing team members
+
+## Supported Share Objects
+
+### Standard Objects
+
+| Object | Share Table |
+|--------|------------|
+| Account | `AccountShare` |
+| Contact | `ContactShare` |
+| Case | `CaseShare` |
+| Lead | `LeadShare` |
+| Opportunity | `OpportunityShare` |
+| Campaign | `CampaignShare` |
+| Order | `OrderShare` |
+
+### Custom Objects
+
+Custom objects follow the pattern: `ObjectName__c` → `ObjectName__Share`
+
+The system uses a hardcoded whitelist for standard objects and derives the share table name for custom objects automatically.
+
+## Deployment Requirements
+
+### Org Requirements
+
+* Salesforce **Enterprise Edition** or higher (for sharing model support)
+* Objects must have **Private** or **Public Read Only** OWD to benefit from sharing
+
+### User Requirements
+
+* Users need appropriate permission set assigned
+* Users need base object access (e.g., Account read access to use Account teams)

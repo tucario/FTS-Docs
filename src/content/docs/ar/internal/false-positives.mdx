@@ -1,0 +1,158 @@
+---
+title: الإيجابيات الكاذبة
+description: تحذيرات ماسح الأمان التي تمت مراجعتها وتحديدها على أنها إيجابيات كاذبة أو مخاطر مقبولة.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+## الملخص
+
+| المعرف | القاعدة | الشدة | الملف | الحالة |
+|----|------|----------|------|--------|
+| FP-01 | ApexCRUDViolation | High | ObjectTeamMemberTriggerHandler.cls | مكبوت — سياق Trigger |
+| FP-02 | ApexCRUDViolation | High | ObjectTeamMemberController.cls (TeamMemberSelector) | مكبوت — تصميم مقصود |
+| FP-03 | ApexSOQLInjection | High | ObjectTeamMemberTriggerHandler.cls | إيجابي كاذب — مصدر آمن |
+| FP-04 | ApexSOQLInjection | High | ShareRecordQueueable.cls | إيجابي كاذب — قائمة بيضاء |
+| FP-05 | ApexSOQLInjection | High | ObjectTeamMemberController.cls | إيجابي كاذب — مصدر آمن |
+| FP-06 | DebugStatements | Low | ملفات متعددة | مخاطرة مقبولة |
+
+## التفسيرات المفصلة
+
+### FP-01: ApexCRUDViolation في ObjectTeamMemberTriggerHandler
+
+| السمة | القيمة |
+|-----------|-------|
+| الملف | ObjectTeamMemberTriggerHandler.cls |
+| السطر | مستوى الفئة |
+| القاعدة | ApexCRUDViolation |
+| الشدة | High |
+| الحالة | مكبوت مع @SuppressWarnings |
+
+**السبب:** يعمل معالج trigger هذا في سياق trigger حيث تم بالفعل التحقق من أذونات CRUD بواسطة وحدة التحكم المستدعية (ObjectTeamMemberController). ينفذ المعالج عمليات على مستوى النظام بما في ذلك الإنشاء التلقائي لسجلات Owner وإدارة سجلات المشاركة، والتي تتطلب وصولاً مرتفعًا.
+
+**التخفيف:** يتم تطبيق فحوصات CRUD في ObjectTeamMemberController قبل أن تصل أي عملية DML إلى trigger.
+
+---
+
+### FP-02: ApexCRUDViolation في TeamMemberSelector
+
+| السمة | القيمة |
+|-----------|-------|
+| الملف | ObjectTeamMemberController.cls |
+| السطر | 129-150 (فئة داخلية) |
+| القاعدة | ApexCRUDViolation |
+| الشدة | High |
+| الحالة | مكبوت مع @SuppressWarnings |
+
+**السبب:** تستخدم الفئة الداخلية TeamMemberSelector عمدًا "without sharing" للسماح للمستخدمين بعرض أعضاء الفريق على السجلات التي لديهم وصول إليها. هذا يعكس سلوك AccountTeamMember القياسي في Salesforce.
+
+**التخفيف:** يمكن للمستخدمين الوصول إلى هذا فقط عبر مكونات LWC على السجلات التي يمكنهم بالفعل عرضها. يأتي معامل recordId من سياق واجهة المستخدم لسجل قابل للوصول.
+
+---
+
+### FP-03: ApexSOQLInjection في ObjectTeamMemberTriggerHandler
+
+| السمة | القيمة |
+|-----------|-------|
+| الملف | ObjectTeamMemberTriggerHandler.cls |
+| الأسطر | 135، 305 |
+| القاعدة | ApexSOQLInjection |
+| الشدة | High |
+| الحالة | إيجابي كاذب |
+
+**السبب:** اسم الكائن المستخدم في SOQL الديناميكي مشتق من معرف Salesforce باستخدام طريقة المنصة `Id.valueOf(actualRecordId).getSObjectType().getDescribe().getName()`. لا يمكن التلاعب بهذا من قبل المستخدمين.
+
+**نمط الكود:**
+
+```apex
+String objectName = Id.valueOf(actualRecordId)
+    .getSObjectType().getDescribe().getName();
+String query = 'SELECT OwnerId FROM '
+    + String.escapeSingleQuotes(objectName)
+    + ' WHERE Id = :actualRecordId';
+```
+
+**التخفيف:** يأتي اسم الكائن من معرف Salesforce (ليس مدخل مستخدم). يتم استخدام متغيرات الربط للقيم التي يتحكم فيها المستخدم. يتم تطبيق التصفية الإضافية كدفاع متعمق.
+
+---
+
+### FP-04: ApexSOQLInjection في ShareRecordQueueable
+
+| السمة | القيمة |
+|-----------|-------|
+| الملف | ShareRecordQueueable.cls |
+| الأسطر | 138-141، 163-167 |
+| القاعدة | ApexSOQLInjection |
+| الشدة | High |
+| الحالة | إيجابي كاذب |
+
+**السبب:** تأتي أسماء كائنات المشاركة من قائمة بيضاء مشفرة للكائنات القياسية أو تتبع نمطًا حتميًا للكائنات المخصصة.
+
+**القائمة البيضاء:**
+
+```apex
+Map<String, String> standardShareObjects = new Map<String, String>{
+    'Account' => 'AccountShare',
+    'Contact' => 'ContactShare',
+    'Case' => 'CaseShare',
+    'Lead' => 'LeadShare',
+    'Opportunity' => 'OpportunityShare',
+    'Campaign' => 'CampaignShare',
+    'Order' => 'OrderShare'
+};
+```
+
+**التخفيف:** أسماء الكائنات تم التحقق منها مقابل قائمة بيضاء. تتبع الكائنات المخصصة نمطًا آمنًا (`ObjectName__c` -> `ObjectName__Share`). يتم استخدام متغيرات الربط لجميع القيم التي يتحكم فيها المستخدم.
+
+---
+
+### FP-05: ApexSOQLInjection في ObjectTeamMemberController
+
+| السمة | القيمة |
+|-----------|-------|
+| الملف | ObjectTeamMemberController.cls |
+| السطر | 89 |
+| القاعدة | ApexSOQLInjection |
+| الشدة | High |
+| الحالة | إيجابي كاذب |
+
+**السبب:** نفس FP-03. اسم الكائن مشتق من معرف Salesforce باستخدام واجهة برمجة التطبيقات للمنصة.
+
+**التخفيف:** اسم الكائن من `Id.getSObjectType().getDescribe().getName()`. لا يمكن تزويره. يتم استخدام متغير الربط لمعرف السجل.
+
+---
+
+### FP-06: DebugStatements
+
+| السمة | القيمة |
+|-----------|-------|
+| الملفات | ObjectTeamMemberTriggerHandler.cls، ShareRecordQueueable.cls، ExpiredTeamMemberCleanupBatch.cls |
+| القاعدة | DebugStatements |
+| الشدة | Low |
+| الحالة | مخاطرة مقبولة |
+
+**السبب:** يتم الاحتفاظ بعبارات التصحيح لاستكشاف الأخطاء وإصلاحها في الإنتاج. يتم تسجيلها فقط على مستويات ERROR/WARN ولا تحتوي على بيانات حساسة.
+
+**المحتوى المسجل:** رسائل الاستثناءات، عدد السجلات، معلومات حالة المهمة.
+
+**التخفيف:** يمكن تصفية مخرجات التصحيح عبر إعدادات سجل التصحيح في Salesforce. لا يتم تسجيل PII أو بيانات الاعتماد.
+
+## ملخص ضوابط الأمان
+
+| الضبط | الحالة | التنفيذ |
+|---------|--------|---------------|
+| فحوصات CRUD في وحدات التحكم | مطبق | `isAccessible()`، `isCreateable()`، `isUpdateable()`، `isDeletable()` |
+| تطبيق FLS | مطبق | Permission Sets تتحكم في الوصول للحقول |
+| منع حقن SOQL | مطبق | متغيرات ربط لمدخلات المستخدم، قائمة بيضاء لأسماء الكائنات |
+| نموذج المشاركة | مطبق | `with sharing` على وحدات التحكم، `without sharing` فقط حيث موثق |
+| التحقق من المدخلات | مطبق | فحوصات null، التحقق من التنسيق، قواعد العمل |
+| منع XSS | مطبق | إطار عمل LWC يتعامل مع ترميز المخرجات |
+
+## التكاملات الخارجية
+
+| الفحص | النتيجة |
+|-------|--------|
+| استدعاءات HTTP | لا شيء — الحزمة لا تقوم باستدعاءات خارجية |
+| Named Credentials | غير مستخدم |
+| External Objects | غير مستخدم |
+| Remote Site Settings | غير مطلوب |

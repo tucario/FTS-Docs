@@ -1,0 +1,102 @@
+{
+  "sidebar": [
+    {
+      "label": "Getting Started",
+      "items": [
+        {
+          "label": "Installation",
+          "slug": "getting-started/installation"
+        },
+        {
+          "label": "Configuration",
+          "slug": "getting-started/configuration"
+        }
+      ]
+    },
+    {
+      "label": "Architecture",
+      "items": [
+        {
+          "label": "Overview",
+          "slug": "architecture/overview"
+        },
+        {
+          "label": "Data Model",
+          "slug": "architecture/data-model"
+        },
+        {
+          "label": "Security",
+          "slug": "architecture/security"
+        },
+        {
+          "label": "Sharing Model",
+          "slug": "architecture/sharing-model"
+        }
+      ]
+    },
+    {
+      "label": "Use Cases",
+      "items": [
+        {
+          "label": "Overview",
+          "slug": "use-cases/overview"
+        },
+        {
+          "label": "Initial Setup",
+          "slug": "use-cases/initial-setup"
+        },
+        {
+          "label": "Manage Team",
+          "slug": "use-cases/manage-team"
+        },
+        {
+          "label": "Admin Tasks",
+          "slug": "use-cases/admin-tasks"
+        }
+      ]
+    },
+    {
+      "label": "Release Notes",
+      "items": [
+        {
+          "label": "Overview",
+          "slug": "release-notes/overview"
+        },
+        {
+          "label": "Changelog",
+          "slug": "release-notes/changelog"
+        },
+        {
+          "label": "v1.0",
+          "slug": "release-notes/1-0"
+        }
+      ]
+    },
+    {
+      "label": "Internal",
+      "collapsed": true,
+      "items": [
+        {
+          "label": "Package Build",
+          "slug": "internal/package-build"
+        },
+        {
+          "label": "2GP Release",
+          "slug": "internal/2gp-release"
+        },
+        {
+          "label": "AppExchange",
+          "slug": "internal/appexchange"
+        },
+        {
+          "label": "Security Scan",
+          "slug": "internal/security-scan"
+        },
+        {
+          "label": "False Positives",
+          "slug": "internal/false-positives"
+        }
+      ]
+    }
+  ]
+}

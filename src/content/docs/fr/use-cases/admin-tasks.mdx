@@ -1,0 +1,30 @@
+---
+title: Tâches administratives
+description: Cas d'utilisation de sécurité et d'administration pour Flexible Team Share.
+---
+
+## Cas d'utilisation 8 : Accès sans ensemble de permissions
+
+### Objectif
+
+Vérifier le comportement lorsque l'utilisateur manque des permissions requises.
+
+### Prérequis
+
+- Utilisateur SANS permission set FTS_Data_Access
+- Page d'enregistrement avec composant Object Team
+
+### Étapes
+
+| Étape | Action | Résultat attendu |
+|------|--------|----------------|
+| 1 | Ouvrir la page d'enregistrement | La page se charge |
+| 2 | Voir le composant Object Team | Message d'erreur affiché |
+
+![Erreur Access Required](../../../../assets/pictures/access-required.png)
+
+### Points de validation
+
+- [ ] Message d'erreur clair sur l'accès manquant
+- [ ] Aucune donnée exposée
+- [ ] Aucune erreur/exception système

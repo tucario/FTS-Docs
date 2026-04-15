@@ -1,0 +1,141 @@
+---
+title: Initial Setup
+description: Admin use cases for initial Flexible Team Share configuration.
+slug: 1.0/use-cases/initial-setup
+---
+
+import { Aside, Steps } from '@astrojs/starlight/components';
+
+## Use Case 1: Initial Setup (Admin)
+
+### Objective
+
+Configure Flexible Team Share for first use in the organization.
+
+### Prerequisites
+
+* System Administrator profile
+* FTS\_App\_Access permission set assigned
+
+### Steps
+
+| Step | Action | Expected Result |
+|------|--------|----------------|
+| 1 | Navigate to App Launcher | Search shows "FlexiTeam" app |
+| 2 | Open FlexiTeam app | FlexiTeam Home page loads |
+| 3 | Click "Configuration Wizard" tab | Wizard displays with two sections |
+| 4 | In "Object Configuration", click "Add Object" | Modal opens with available objects |
+| 5 | Select "Case" from dropdown | Case object selected |
+| 6 | Click "Save" | Config saved, Case appears in list as Active |
+| 7 | (Optional) Schedule cleanup job | Job scheduled, next run time displayed |
+
+![Configuration Wizard](../../../../assets/pictures/1.0/config-wizard.png)
+
+### Validation Points
+
+* \[ ] Only objects with Private/Public Read Only OWD appear in dropdown
+* \[ ] Already configured objects don't appear in dropdown
+* \[ ] Active toggle works correctly
+* \[ ] Cleanup job can be scheduled/unscheduled
+
+***
+
+## Use Case 7: Deactivate Object Configuration (Admin)
+
+### Objective
+
+Disable team sharing for an object and remove existing shares.
+
+### Prerequisites
+
+* Object already configured and active
+* Team members exist for this object
+
+### Steps
+
+| Step | Action | Expected Result |
+|------|--------|----------------|
+| 1 | Open Configuration Wizard | Config list visible |
+| 2 | Toggle "Active" switch off for Case | Confirmation dialog |
+| 3 | Confirm deactivation | Status changes to inactive |
+| 4 | Check existing Case teams | Team members remain but shares removed |
+
+### Validation Points
+
+* \[ ] Batch job runs to delete share records
+* \[ ] Team member records preserved
+* \[ ] Can reactivate later (shares recreated)
+* \[ ] Warning about share removal shown
+
+***
+
+## Use Case 9: Manual Cleanup Execution (Admin)
+
+### Objective
+
+Manually trigger cleanup of expired team members.
+
+### Prerequisites
+
+* Admin access
+* Expired team members exist (End\_Date\_\_c in past)
+
+### Steps
+
+| Step | Action | Expected Result |
+|------|--------|----------------|
+| 1 | Open Configuration Wizard | Scheduled Jobs section visible |
+| 2 | View "Expired Members" count | Shows number of expired records |
+| 3 | Click "Run Cleanup Now" | Batch job starts |
+| 4 | Refresh page | Expired count reduced to 0 |
+
+### Validation Points
+
+* \[ ] Expired count accurate
+* \[ ] Batch job completes successfully
+* \[ ] Expired members deleted
+* \[ ] Associated share records removed
+
+***
+
+## Use Case 11: Configure Component Display (Admin)
+
+### Objective
+
+Customize the Object Team Member component appearance: change the card title and set the maximum number of displayed team members.
+
+### Prerequisites
+
+* System Administrator profile
+* Access to Lightning App Builder
+
+### Steps
+
+| Step | Action | Expected Result |
+|------|--------|----------------|
+| 1 | Open record page in Lightning App Builder | Page editor loads |
+| 2 | Click on the "Team Members" component | Component properties panel opens on the right |
+| 3 | Change "Card Title" to custom value | Title preview updates |
+| 4 | Set "Max Displayed Members" to desired number | Display limit configured |
+| 5 | Save and activate the page | Changes applied |
+| 6 | Open a record with team members | Component shows configured title and respects display limit |
+
+![Lightning App Builder configuration](../../../../assets/pictures/1.0/app-builder-config.png)
+
+### Configuration Options
+
+| Setting | Values | Behavior |
+|---------|--------|----------|
+| Max Displayed Members = 5 | Default | Shows first 5 members, "Show X more" for the rest |
+| Max Displayed Members = 0 | Show all | All team members visible, no collapse/expand |
+| Max Displayed Members = 3 | Custom limit | Shows first 3 members, "Show X more" for the rest |
+
+### Validation Points
+
+* \[ ] Card title changes reflected on the record page
+* \[ ] Display limit respected (correct number of members shown)
+* \[ ] "Show X more" button appears when members exceed limit
+* \[ ] Setting limit to 0 shows all members without collapse button
+* \[ ] Record owner always appears first regardless of limit
+* \[ ] "Show less" button collapses list back to configured limit
+* \[ ] Changes persist after page reload

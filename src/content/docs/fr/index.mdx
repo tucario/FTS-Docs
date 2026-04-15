@@ -1,0 +1,52 @@
+---
+title: Flexible Team Share
+description: Étendez la fonctionnalité Membre d'équipe de compte Salesforce à n'importe quel objet.
+template: splash
+hero:
+  tagline: Créez des équipes collaboratives, gérez les accès et automatisez le partage — le tout au sein de la plateforme Salesforce.
+  image:
+    file: ../../../assets/logo.png
+  actions:
+    - text: Démarrer
+      link: /docs/fr/getting-started/installation/
+      icon: right-arrow
+      variant: primary
+    - text: Voir l'architecture
+      link: /docs/fr/architecture/overview/
+      icon: seti:config
+---
+
+import { LinkCard, CardGrid } from '@astrojs/starlight/components';
+
+## Fonctionnalités clés
+
+<CardGrid>
+	<LinkCard title="Appartenance d'équipe universelle" href="/docs/fr/getting-started/installation/" description="Ajoutez des membres d'équipe à n'importe quel objet, pas seulement aux comptes. Prend en charge les objets standard et personnalisés avec OWD privé ou lecture publique seule." />
+	<LinkCard title="Partage automatique d'enregistrements" href="/docs/fr/architecture/sharing-model/" description="Les membres d'équipe reçoivent automatiquement un accès approprié. Les enregistrements de partage sont créés, mis à jour et supprimés automatiquement." />
+	<LinkCard title="Accès basé sur les rôles" href="/docs/fr/architecture/security/" description="Rôles propriétaire, gestionnaire et utilisateur avec des permissions distinctes. Les gestionnaires peuvent ajouter/modifier/supprimer des membres d'équipe." />
+	<LinkCard title="Affectations temporaires" href="/docs/fr/getting-started/configuration/#temporary-access-with-end-date" description="Appartenances d'équipe à durée limitée avec nettoyage automatique. Définissez une date de fin et les membres expirés sont supprimés automatiquement." />
+</CardGrid>
+
+## Objets pris en charge
+
+- **Objets standard** : Account, Contact, Case, Lead, Opportunity, Campaign, Order
+- **Objets personnalisés** : Tout objet personnalisé avec OWD privé ou lecture publique seule
+
+## Démarrage rapide
+
+1. **Installez** le package depuis AppExchange
+2. **Attribuez** les ensembles de permissions (FTS_App_Access pour les administrateurs, FTS_Data_Access pour les utilisateurs)
+3. **Configurez** les objets via l'assistant de configuration
+4. **Ajoutez** le composant Membre d'équipe aux pages d'enregistrement
+
+Prêt à commencer ? Consultez le [guide d'installation](/fr/getting-started/installation/).
+
+## Informations sur le package
+
+| Propriété | Valeur |
+|----------|-------|
+| **Namespace** | `tucariofts` |
+| **Éditeur** | Tucario |
+| **Version API** | 65.0 |
+| **Type de package** | 2GP Managed Package |
+| **Support** | hello@tucario.com |

@@ -1,0 +1,121 @@
+---
+title: Relatório de Security Scan
+description: Resultados de análise estática de código e melhores práticas de segurança.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+## Ferramentas de Scan Utilizadas
+
+| Ferramenta | Versão | Propósito |
+|------|---------|---------|
+| Salesforce Code Analyzer v5 | Mais recente | Análise de segurança Apex/LWC |
+| PMD (incl. AppExchange rules) | v5 | Qualidade de código & segurança |
+| ESLint | v5 | Análise JavaScript/LWC |
+| RetireJS | v5 | Bibliotecas JS vulneráveis |
+| Partner Security Portal (Checkmarx) | Mais recente | Scan de fonte obrigatório |
+
+## Como Gerar Relatórios de Scan
+
+### Pré-requisitos
+
+```bash
+# Install Salesforce CLI
+npm install -g @salesforce/cli
+
+# Install Code Analyzer v5 plugin
+sf plugins install @salesforce/plugin-code-analyzer
+```
+
+### Executar Scan Completo
+
+```bash
+# Run all rules with HTML output
+sf code-analyzer run --workspace force-app --output-file docs/scan-results.html
+
+# Run AppExchange-specific rules
+sf code-analyzer run --rule-selector AppExchange --workspace force-app --output-file docs/scan-appexchange.html
+
+# Run Security-tagged rules only
+sf code-analyzer run --rule-selector Security --workspace force-app --output-file docs/scan-security.html
+
+# Fail on High or Critical (CI/CD)
+sf code-analyzer run --rule-selector AppExchange --workspace force-app --severity-threshold 2 --output-file docs/scan-appexchange.html
+```
+
+## Melhores Práticas de Segurança Implementadas
+
+### Aplicação CRUD/FLS
+
+- Verificação `isCreateable()` antes de INSERT
+- Verificação `isUpdateable()` antes de UPDATE
+- Verificação `isDeletable()` antes de DELETE
+- Permissões em nível de campo via Permission Sets
+
+### Prevenção de Injeção SOQL
+
+- Bind variables usadas para entrada de usuário
+- `String.escapeSingleQuotes()` para queries dinâmicas
+- Nomes de objeto derivados de IDs Salesforce (não entrada de usuário)
+
+### Conformidade com Sharing Model
+
+- `with sharing` em controllers principais
+- `without sharing` apenas onde documentado e necessário
+- Registros de compartilhamento respeitam configurações OWD
+
+### Segurança LWC
+
+- Sem `eval()` ou execução de script dinâmico
+- Entrada de usuário sanitizada antes de exibição
+- Sem credenciais codificadas
+
+## Segurança de Integração Externa
+
+| Verificação | Status | Notas |
+|-------|--------|-------|
+| HTTP Callouts | N/A | Pacote não faz chamadas externas |
+| Named Credentials | N/A | Não usado |
+| External Objects | N/A | Não usado |
+| Remote Site Settings | N/A | Não necessário |
+| CSP Violations | Pass | Sem violações de Content-Security-Policy |
+
+## Cobertura de Teste Apex
+
+| Classe | Cobertura | Status |
+|-------|----------|--------|
+| ObjectTeamMemberController | >75% | Pass |
+| TeamMemberWizardController | >75% | Pass |
+| ShareRecordQueueable | >75% | Pass |
+| SharingRecalculationBatch | >75% | Pass |
+| ExpiredTeamMemberCleanupBatch | >75% | Pass |
+| ObjectTeamMemberTriggerHandler | >75% | Pass |
+| PostInstallHandler | >75% | Pass |
+| **Geral** | **>75%** | **Pass** |
+
+### Como Executar Testes com Cobertura
+
+```bash
+# Run all tests with coverage
+sf apex run test --code-coverage --result-format human --target-org [ORG_ALIAS]
+
+# Run specific test class
+sf apex run test --tests ObjectTeamMemberTest --code-coverage --result-format human --target-org [ORG_ALIAS]
+```
+
+## Referência de Comandos do Scanner (Code Analyzer v5)
+
+```bash
+# List available rules
+sf code-analyzer rules
+
+# List AppExchange rules only
+sf code-analyzer rules --rule-selector AppExchange
+
+# Run with specific rule selector
+sf code-analyzer run --rule-selector Security --workspace force-app
+
+# Export to various formats
+sf code-analyzer run --workspace force-app --output-file results.html
+sf code-analyzer run --workspace force-app --output-file results.sarif
+```

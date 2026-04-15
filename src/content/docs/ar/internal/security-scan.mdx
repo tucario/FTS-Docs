@@ -1,0 +1,121 @@
+---
+title: تقرير المسح الأمني
+description: نتائج تحليل الكود الثابت وأفضل ممارسات الأمان.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+## أدوات المسح المستخدمة
+
+| الأداة | الإصدار | الغرض |
+|------|---------|---------|
+| Salesforce Code Analyzer v5 | الأحدث | تحليل أمان Apex/LWC |
+| PMD (incl. AppExchange rules) | v5 | جودة الكود والأمان |
+| ESLint | v5 | تحليل JavaScript/LWC |
+| RetireJS | v5 | مكتبات JS الضعيفة |
+| Partner Security Portal (Checkmarx) | الأحدث | مسح المصدر الإلزامي |
+
+## كيفية إنشاء تقارير المسح
+
+### المتطلبات الأساسية
+
+```bash
+# تثبيت Salesforce CLI
+npm install -g @salesforce/cli
+
+# تثبيت ملحق Code Analyzer v5
+sf plugins install @salesforce/plugin-code-analyzer
+```
+
+### تشغيل المسح الكامل
+
+```bash
+# تشغيل جميع القواعد مع مخرجات HTML
+sf code-analyzer run --workspace force-app --output-file docs/scan-results.html
+
+# تشغيل قواعد AppExchange المحددة
+sf code-analyzer run --rule-selector AppExchange --workspace force-app --output-file docs/scan-appexchange.html
+
+# تشغيل القواعد الموسومة بـ Security فقط
+sf code-analyzer run --rule-selector Security --workspace force-app --output-file docs/scan-security.html
+
+# الفشل على High أو Critical (CI/CD)
+sf code-analyzer run --rule-selector AppExchange --workspace force-app --severity-threshold 2 --output-file docs/scan-appexchange.html
+```
+
+## أفضل ممارسات الأمان المطبقة
+
+### تطبيق CRUD/FLS
+
+- فحص `isCreateable()` قبل INSERT
+- فحص `isUpdateable()` قبل UPDATE
+- فحص `isDeletable()` قبل DELETE
+- أذونات على مستوى الحقل عبر Permission Sets
+
+### منع حقن SOQL
+
+- يتم استخدام متغيرات الربط لمدخلات المستخدم
+- `String.escapeSingleQuotes()` للاستعلامات الديناميكية
+- أسماء الكائنات مشتقة من معرفات Salesforce (ليست مدخلات مستخدم)
+
+### الامتثال لنموذج المشاركة
+
+- `with sharing` على وحدات التحكم الرئيسية
+- `without sharing` فقط حيث موثق وضروري
+- تحترم سجلات المشاركة إعدادات OWD
+
+### أمان LWC
+
+- لا يوجد `eval()` أو تنفيذ نص برمجي ديناميكي
+- يتم تنقية مدخلات المستخدم قبل العرض
+- لا توجد بيانات اعتماد مشفرة
+
+## أمان التكامل الخارجي
+
+| الفحص | الحالة | ملاحظات |
+|-------|--------|-------|
+| استدعاءات HTTP | غير قابل للتطبيق | الحزمة لا تقوم باستدعاءات خارجية |
+| Named Credentials | غير قابل للتطبيق | غير مستخدم |
+| External Objects | غير قابل للتطبيق | غير مستخدم |
+| Remote Site Settings | غير قابل للتطبيق | غير مطلوب |
+| انتهاكات CSP | نجح | لا توجد انتهاكات Content-Security-Policy |
+
+## تغطية اختبار Apex
+
+| الفئة | التغطية | الحالة |
+|-------|----------|--------|
+| ObjectTeamMemberController | >75% | نجح |
+| TeamMemberWizardController | >75% | نجح |
+| ShareRecordQueueable | >75% | نجح |
+| SharingRecalculationBatch | >75% | نجح |
+| ExpiredTeamMemberCleanupBatch | >75% | نجح |
+| ObjectTeamMemberTriggerHandler | >75% | نجح |
+| PostInstallHandler | >75% | نجح |
+| **الإجمالي** | **>75%** | **نجح** |
+
+### كيفية تشغيل الاختبارات مع التغطية
+
+```bash
+# تشغيل جميع الاختبارات مع التغطية
+sf apex run test --code-coverage --result-format human --target-org [ORG_ALIAS]
+
+# تشغيل فئة اختبار محددة
+sf apex run test --tests ObjectTeamMemberTest --code-coverage --result-format human --target-org [ORG_ALIAS]
+```
+
+## مرجع أوامر الماسح (Code Analyzer v5)
+
+```bash
+# سرد القواعد المتاحة
+sf code-analyzer rules
+
+# سرد قواعد AppExchange فقط
+sf code-analyzer rules --rule-selector AppExchange
+
+# التشغيل مع محدد قاعدة محدد
+sf code-analyzer run --rule-selector Security --workspace force-app
+
+# التصدير إلى تنسيقات مختلفة
+sf code-analyzer run --workspace force-app --output-file results.html
+sf code-analyzer run --workspace force-app --output-file results.sarif
+```

@@ -1,0 +1,263 @@
+---
+title: Configuración
+description: Configure los componentes de Flexible Team Share, sincronización de propietarios y trabajos programados.
+---
+
+import { Aside, Steps } from '@astrojs/starlight/components';
+
+## Configuración del Componente
+
+El componente Object Team Member puede configurarse directamente en Lightning App Builder con las siguientes propiedades:
+
+| Propiedad | Tipo | Predeterminado | Descripción |
+|----------|------|---------|-------------|
+| **Card Title** | String | Team Members | El título mostrado en la tarjeta del componente |
+| **Max Displayed Members** | Integer | 5 | Número máximo de miembros del equipo mostrados antes de contraerse. Establézcalo en 0 para mostrar todos |
+
+Cuando el número de miembros del equipo excede el límite configurado, la lista se contrae y muestra un botón **"Show all (X more)"**. Al hacer clic en él, se expande la lista completa, con un botón **"Show less"** para contraerla nuevamente. El propietario del registro siempre aparece primero en la lista, independientemente del límite de visualización.
+
+![Collapsed team member list](../../../../assets/pictures/team-members-collapsed.png)
+
+![Lightning App Builder — component properties](../../../../assets/pictures/app-builder-config.png)
+
+### Comportamiento del Límite de Visualización
+
+| Configuración | Comportamiento |
+|---------|----------|
+| Max Displayed Members = **5** (predeterminado) | Muestra los primeros 5 miembros, "Show X more" para el resto |
+| Max Displayed Members = **0** | Todos los miembros del equipo visibles, sin contraer/expandir |
+| Max Displayed Members = **3** (personalizado) | Muestra los primeros 3 miembros, "Show X more" para el resto |
+
+## Roles de Miembros del Equipo
+
+Al agregar usuarios a un equipo, se les asigna uno de los siguientes roles:
+
+| Rol | Descripción | Capacidades |
+|------|-------------|-------------|
+| **Owner** | El propietario del registro | Se asigna automáticamente cuando se crea un registro. No se puede asignar o eliminar manualmente. Tiene acceso completo para gestionar miembros del equipo. Se elimina automáticamente cuando no hay otros usuarios en el equipo. |
+| **Manager** | Administrador del equipo | Puede agregar, editar y eliminar miembros del equipo. Use este rol para usuarios que necesitan gestionar la composición del equipo. |
+| **User** | Miembro de equipo estándar | Puede ver la lista de miembros del equipo pero no puede modificarla. Use este rol para usuarios que solo necesitan acceso al registro. |
+
+![Team Members component showing roles](../../../../assets/pictures/team-members-expanded.png)
+
+<Aside type="note">
+- El rol **Owner** es creado automáticamente por el sistema y representa al propietario actual del registro
+- Tanto los roles **Manager** como **User** reciben acceso al registro basado en su Nivel de Acceso asignado (Read Only o Read/Write)
+- Solo los usuarios con roles **Owner** o **Manager** pueden agregar, editar o eliminar miembros del equipo
+</Aside>
+
+## Sincronización de Cambio de Propietario
+
+Cuando el propietario del registro cambia (por ejemplo, una Cuenta se reasigna a otro representante de ventas), el miembro del equipo Owner **NO se actualiza automáticamente**. El sistema crea el registro Owner cuando se agrega el primer miembro del equipo, pero no rastrea los cambios posteriores de propietario en el registro padre.
+
+Para mantener el Owner del equipo sincronizado con el propietario del registro, debe crear un **Record-Triggered Flow**.
+
+<Aside type="note" title="¿Por qué no es automático?">
+Los paquetes administrados de Salesforce no pueden incluir triggers en objetos estándar como Account u Opportunity. Flexible Team Share proporciona una **Invocable Action** que puede llamar desde un Flow para sincronizar el propietario cuando sea necesario.
+</Aside>
+
+### Configuración mediante Flow (Recomendado)
+
+<Steps>
+1. Vaya a **Setup** > **Flows**
+2. Haga clic en **New Flow** > **Record-Triggered Flow**
+3. Seleccione el objeto (por ejemplo, Account)
+4. Configure el disparador: **"A record is updated"**
+5. Agregue Entry Condition: Formula > `ISCHANGED({!$Record.OwnerId})` se evalúa como `true`
+6. Establezca **"When to Run the Flow"** en **"After the record is saved"**
+7. Agregue el elemento **Action**
+8. Busque **"Sync Team Member Owner"**
+9. Establezca el parámetro **"Record ID"** en `{!$Record.Id}`
+10. Deje **"Object API Name"** vacío (se deriva automáticamente del Record ID)
+11. Guarde y **Active** el Flow
+</Steps>
+
+![Flow Builder - Owner Sync Flow](../../../../assets/pictures/flow-builder-owner-sync.png)
+![Sync Team Member Owner action configuration](../../../../assets/pictures/sync-owner-action-config.png)
+
+<Aside type="tip">
+Repita estos pasos para cada objeto donde desee sincronización automática de propietario (por ejemplo, Account, Opportunity, Case, Lead).
+</Aside>
+
+### Configuración mediante Apex Trigger
+
+```apex
+trigger AccountOwnerSync on Account(after update) {
+  List<tucariofts.SyncOwnerInvocable.SyncOwnerRequest> requests =
+    new List<tucariofts.SyncOwnerInvocable.SyncOwnerRequest>();
+
+  for (Account acc : Trigger.new) {
+    Account oldAcc = Trigger.oldMap.get(acc.Id);
+    if (acc.OwnerId != oldAcc.OwnerId) {
+      tucariofts.SyncOwnerInvocable.SyncOwnerRequest req =
+        new tucariofts.SyncOwnerInvocable.SyncOwnerRequest();
+      req.recordId = acc.Id;
+      requests.add(req);
+    }
+  }
+
+  if (!requests.isEmpty()) {
+    tucariofts.SyncOwnerInvocable.syncOwners(requests);
+  }
+}
+```
+
+### Llamada desde Código Apex (Registro Único)
+
+```apex
+tucariofts.SyncOwnerInvocable.SyncOwnerRequest request =
+    new tucariofts.SyncOwnerInvocable.SyncOwnerRequest();
+request.recordId = accountId;
+
+List<tucariofts.SyncOwnerInvocable.SyncOwnerResult> results =
+    tucariofts.SyncOwnerInvocable.syncOwners(
+        new List<tucariofts.SyncOwnerInvocable.SyncOwnerRequest>{ request }
+    );
+
+if (results[0].success) {
+    System.debug('Owner synced: ' + results[0].oldOwnerId +
+                 ' → ' + results[0].newOwnerId);
+} else {
+    System.debug('Sync failed: ' + results[0].message);
+}
+```
+
+### Objeto de Resultado
+
+| Campo | Tipo | Descripción |
+|-------|------|-------------|
+| `success` | Boolean | Si la sincronización tuvo éxito |
+| `message` | String | Mensaje de resultado o detalles del error |
+| `oldOwnerId` | Id | ID de Usuario del propietario anterior |
+| `newOwnerId` | Id | ID de Usuario del nuevo propietario |
+
+### Escenarios de Error
+
+| Escenario | Resultado |
+|----------|--------|
+| No hay miembros del equipo en el registro | `success = false`, "No Owner team member found" |
+| Propietario sin cambios | `success = true`, "Owner unchanged, no update needed" |
+| Record ID null | `success = false`, "Record ID is required" |
+| Record ID inválido | `success = false`, mensaje de error |
+
+### Limitaciones Importantes
+
+**Queue Owners Not Supported** — Flexible Team Share no admite Colas como propietarios de equipo. Cuando un registro es propiedad de una Cola:
+
+- El sistema usa el **usuario actual** (la persona que primero agrega un miembro del equipo) como el Owner en el equipo
+- Si luego cambia el propietario del registro de una Cola a un Usuario, ejecute la acción Sync Owner para actualizar el equipo
+- Si cambia el propietario de un Usuario a una Cola, el Owner del equipo permanecerá como el usuario anterior
+
+**Flow Must Be Created Per Object** — Debe crear un Flow separado para cada tipo de objeto donde desee sincronización de propietario. La Invocable Action funciona con cualquier objeto, pero Salesforce requiere Record-Triggered Flows separados por objeto.
+
+## Acceso Temporal con Fecha de Finalización
+
+Al agregar un miembro del equipo, puede establecer opcionalmente una **End Date** para otorgar acceso temporal a un registro. Esto es útil para:
+
+- Colaboraciones basadas en proyectos con plazos definidos
+- Consultores o contratistas temporales
+- Cobertura de vacaciones o responsabilidades delegadas
+- Períodos de auditoría o revisión
+
+### Cómo Funciona
+
+<Steps>
+1. Al agregar o editar un miembro del equipo, establezca el campo **End Date** en el último día que deben tener acceso
+2. El miembro del equipo retiene acceso completo hasta el final de ese día
+3. Después de que pase la End Date, el trabajo de limpieza programado elimina automáticamente al miembro del equipo y revoca su acceso
+</Steps>
+
+![Team member with End Date](../../../../assets/pictures/team-members-end-date.png)
+
+### Proceso de Limpieza Automática
+
+- Un trabajo de lote programado se ejecuta diariamente (por defecto a las 2:00 AM) para eliminar miembros del equipo vencidos
+- Cuando se elimina un miembro del equipo, su registro compartido también se elimina, revocando el acceso al registro
+- El trabajo de limpieza puede gestionarse desde el Asistente de Configuración
+
+![Scheduled job management](../../../../assets/pictures/install-guide-14.png)
+
+## Trabajo Programado
+
+Flexible Team Share incluye un trabajo de limpieza automática que elimina miembros del equipo vencidos. Este trabajo se programa automáticamente durante la instalación del paquete.
+
+### Verificar el Trabajo
+
+<Steps>
+1. Vaya a **Setup** > **Scheduled Jobs**
+2. Busque **Flexible Team Share - Expired Member Cleanup**
+3. Verifique que el trabajo esté programado para ejecutarse diariamente
+</Steps>
+
+![Scheduled Jobs in Setup](../../../../assets/pictures/install-guide-20.png)
+
+### Gestión Manual del Trabajo
+
+Los administradores pueden gestionar el trabajo de limpieza desde el Asistente de Configuración:
+
+- **Schedule Job** — Programar manualmente si no está ejecutándose
+- **Unschedule Job** — Detener la limpieza automática
+- **Run Now** — Ejecutar la limpieza inmediatamente
+
+## Solución de Problemas
+
+### Advertencia "Configuration Not Found"
+
+**Síntoma:** Aparece un modal de advertencia indicando que no existe configuración para este objeto.
+
+**Causa:** El componente Miembro de Equipo se agregó a una página de registro antes de configurar el objeto en el Asistente de Configuración.
+
+**Solución:**
+<Steps>
+1. Vaya al Asistente de Configuración (aplicación Flexible Team Share > Configuration)
+2. Agregue y despliegue una configuración para este objeto
+3. Regrese a la página de registro — el componente ahora debería funcionar correctamente
+</Steps>
+
+![Configuration Not Found warning](../../../../assets/pictures/install-guide-15.png)
+
+### Error "No Access"
+
+**Síntoma:** El componente muestra un mensaje "No Access" con un icono de candado en lugar de miembros del equipo.
+
+**Causa:** El usuario actual no tiene asignado el Permission Set Group requerido.
+
+**Solución:**
+<Steps>
+1. Vaya a **Setup** > **Permission Set Groups**
+2. Asigne el Permission Set Group **Admin** o **User** a los usuarios afectados
+3. Los usuarios pueden necesitar cerrar sesión y volver a iniciar sesión para que los cambios surtan efecto
+</Steps>
+
+![No Access error](../../../../assets/pictures/install-guide-16.png)
+
+### Advertencia "Limit Reached"
+
+**Síntoma:** El botón "Add Team Member" está deshabilitado y un mensaje indica que se ha alcanzado el límite.
+
+**Causa:** Ha alcanzado el número máximo de miembros del equipo permitidos.
+
+**Solución:** Elimine miembros del equipo inactivos o innecesarios para liberar espacios.
+
+| Miembros del Equipo Dentro del Límite | Miembros del Equipo Más Allá del Límite |
+|:-----|:-----|
+| ![Within limit](../../../../assets/pictures/install-guide-17.png) | ![Beyond limit](../../../../assets/pictures/install-guide-18.png) |
+
+![Limit reached warning detail](../../../../assets/pictures/install-guide-19.png)
+
+### El Uso Compartido No Funciona
+
+**Síntoma:** Los miembros del equipo se agregan exitosamente pero no pueden acceder al registro.
+
+**Causa:** La configuración de Organization-Wide Default (OWD) del objeto está establecida en Public Read/Write.
+
+**Solución:**
+<Steps>
+1. Vaya a **Setup** > **Sharing Settings**
+2. Cambie el OWD del objeto a **Private** o **Public Read Only**
+3. Nota: Cambiar la configuración de OWD puede afectar el acceso de otros usuarios — consulte con su administrador de Salesforce
+</Steps>
+
+## Soporte
+
+Para preguntas o problemas, comuníquese con [support@tucario.com](mailto:support@tucario.com).

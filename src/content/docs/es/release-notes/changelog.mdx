@@ -1,0 +1,27 @@
+---
+title: Registro de Cambios
+description: Registro de cambios completo para todas las versiones de Flexible Team Share.
+---
+
+Todos los cambios notables en Flexible Team Share están documentados en este archivo.
+
+## v1.0 — 2026-02
+
+Versión inicial de Flexible Team Share.
+
+### Agregado
+
+- **Membresía de Equipo Universal** — Agregue miembros del equipo a cualquier objeto de Salesforce (estándar y personalizado)
+- **Uso Compartido Automático de Registros** — Los registros compartidos se crean/actualizan/eliminan automáticamente según la membresía del equipo
+- **Acceso Basado en Roles** — Roles de Owner, Manager y User con permisos distintos
+- **Asignaciones Temporales** — Soporte de fecha de finalización con limpieza automática mediante trabajo por lotes programado
+- **Sincronización de Propietario** — Invocable Action (`SyncOwnerInvocable`) para mantener el Owner del equipo sincronizado cuando cambia el propietario del registro padre
+- **Asistente de Configuración** — UI de administrador para habilitar el uso compartido de equipo por objeto
+- **Lista de Equipo Contraíble** — Límite de visualización configurable con botón "Show more/less"
+- **Componente Personalizable** — Título de tarjeta y máximo de miembros mostrados configurable en Lightning App Builder
+- **Soporte Multi-Objeto** — Account, Contact, Case, Lead, Opportunity, Campaign, Order, y cualquier objeto personalizado
+- **Internacionalización** — 35 idiomas soportados mediante Custom Labels y Translation Workbench
+- **Permission Sets** — FTS_App_Access (admin) y FTS_Data_Access (user)
+- **Seguridad** — Aplicación de CRUD/FLS, prevención de inyección SOQL, cumplimiento del modelo de uso compartido
+
+Vea las [notas de versión completas de v1.0](/es/release-notes/1-0/) para detalles.

@@ -1,0 +1,158 @@
+---
+title: Fałszywe alarmy
+description: Ostrzeżenia skanera bezpieczeństwa przejrzane i uznane za fałszywe alarmy lub akceptowalne ryzyka.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+## Podsumowanie
+
+| ID | Reguła | Waga | Plik | Status |
+|----|------|----------|------|--------|
+| FP-01 | ApexCRUDViolation | High | ObjectTeamMemberTriggerHandler.cls | Wyciszony — kontekst triggera |
+| FP-02 | ApexCRUDViolation | High | ObjectTeamMemberController.cls (TeamMemberSelector) | Wyciszony — zamierzony projekt |
+| FP-03 | ApexSOQLInjection | High | ObjectTeamMemberTriggerHandler.cls | Fałszywy alarm — bezpieczne źródło |
+| FP-04 | ApexSOQLInjection | High | ShareRecordQueueable.cls | Fałszywy alarm — whitelist |
+| FP-05 | ApexSOQLInjection | High | ObjectTeamMemberController.cls | Fałszywy alarm — bezpieczne źródło |
+| FP-06 | DebugStatements | Low | Wiele plików | Zaakceptowane ryzyko |
+
+## Szczegółowe wyjaśnienia
+
+### FP-01: ApexCRUDViolation w ObjectTeamMemberTriggerHandler
+
+| Atrybut | Wartość |
+|-----------|-------|
+| Plik | ObjectTeamMemberTriggerHandler.cls |
+| Linia | Poziom klasy |
+| Reguła | ApexCRUDViolation |
+| Waga | High |
+| Status | Wyciszony za pomocą @SuppressWarnings |
+
+**Powód:** ten handler triggera działa w kontekście triggera, gdzie uprawnienia CRUD zostały już zwalidowane przez wywołujący kontroler (ObjectTeamMemberController). Handler wykonuje operacje na poziomie systemu, w tym automatyczne tworzenie rekordów Owner i zarządzanie rekordami udostępnień, co wymaga podwyższonego dostępu.
+
+**Środki zaradcze:** sprawdzenia CRUD są egzekwowane w ObjectTeamMemberController przed osiągnięciem triggera przez jakąkolwiek operację DML.
+
+---
+
+### FP-02: ApexCRUDViolation w TeamMemberSelector
+
+| Atrybut | Wartość |
+|-----------|-------|
+| Plik | ObjectTeamMemberController.cls |
+| Linia | 129-150 (klasa wewnętrzna) |
+| Reguła | ApexCRUDViolation |
+| Waga | High |
+| Status | Wyciszony za pomocą @SuppressWarnings |
+
+**Powód:** klasa wewnętrzna TeamMemberSelector celowo używa "without sharing", aby umożliwić użytkownikom przeglądanie członków zespołu w rekordach, do których mają dostęp. Odzwierciedla to standardowe zachowanie Salesforce AccountTeamMember.
+
+**Środki zaradcze:** użytkownicy mogą uzyskać dostęp do tego tylko za pośrednictwem komponentów LWC w rekordach, które mogą już przeglądać. Parametr recordId pochodzi z kontekstu UI dostępnego rekordu.
+
+---
+
+### FP-03: ApexSOQLInjection w ObjectTeamMemberTriggerHandler
+
+| Atrybut | Wartość |
+|-----------|-------|
+| Plik | ObjectTeamMemberTriggerHandler.cls |
+| Linie | 135, 305 |
+| Reguła | ApexSOQLInjection |
+| Waga | High |
+| Status | Fałszywy alarm |
+
+**Powód:** nazwa obiektu używana w dynamicznym SOQL jest wyprowadzana z ID Salesforce za pomocą metody platformowej `Id.valueOf(actualRecordId).getSObjectType().getDescribe().getName()`. Nie może być manipulowana przez użytkowników.
+
+**Wzorzec kodu:**
+
+```apex
+String objectName = Id.valueOf(actualRecordId)
+    .getSObjectType().getDescribe().getName();
+String query = 'SELECT OwnerId FROM '
+    + String.escapeSingleQuotes(objectName)
+    + ' WHERE Id = :actualRecordId';
+```
+
+**Środki zaradcze:** nazwa obiektu pochodzi z ID Salesforce (nie danych wejściowych użytkownika). Bind variables używane dla wartości kontrolowanych przez użytkownika. Dodatkowe oczyszczanie zastosowane jako obrona w głąb.
+
+---
+
+### FP-04: ApexSOQLInjection w ShareRecordQueueable
+
+| Atrybut | Wartość |
+|-----------|-------|
+| Plik | ShareRecordQueueable.cls |
+| Linie | 138-141, 163-167 |
+| Reguła | ApexSOQLInjection |
+| Waga | High |
+| Status | Fałszywy alarm |
+
+**Powód:** nazwy obiektów udostępnień pochodzą z zakodowanej listy dozwolonych obiektów standardowych lub podlegają deterministycznemu wzorcowi dla obiektów niestandardowych.
+
+**Whitelist:**
+
+```apex
+Map<String, String> standardShareObjects = new Map<String, String>{
+    'Account' => 'AccountShare',
+    'Contact' => 'ContactShare',
+    'Case' => 'CaseShare',
+    'Lead' => 'LeadShare',
+    'Opportunity' => 'OpportunityShare',
+    'Campaign' => 'CampaignShare',
+    'Order' => 'OrderShare'
+};
+```
+
+**Środki zaradcze:** nazwy obiektów walidowane na podstawie whitelisty. Obiekty niestandardowe podlegają bezpiecznemu wzorcowi (`ObjectName__c` -> `ObjectName__Share`). Bind variables używane dla wszystkich wartości kontrolowanych przez użytkownika.
+
+---
+
+### FP-05: ApexSOQLInjection w ObjectTeamMemberController
+
+| Atrybut | Wartość |
+|-----------|-------|
+| Plik | ObjectTeamMemberController.cls |
+| Linia | 89 |
+| Reguła | ApexSOQLInjection |
+| Waga | High |
+| Status | Fałszywy alarm |
+
+**Powód:** tak samo jak FP-03. Nazwa obiektu wyprowadzana z ID Salesforce za pomocą API platformy.
+
+**Środki zaradcze:** nazwa obiektu z `Id.getSObjectType().getDescribe().getName()`. Nie może być sfałszowana. Bind variable używana dla record ID.
+
+---
+
+### FP-06: DebugStatements
+
+| Atrybut | Wartość |
+|-----------|-------|
+| Pliki | ObjectTeamMemberTriggerHandler.cls, ShareRecordQueueable.cls, ExpiredTeamMemberCleanupBatch.cls |
+| Reguła | DebugStatements |
+| Waga | Low |
+| Status | Zaakceptowane ryzyko |
+
+**Powód:** instrukcje debug zachowane do rozwiązywania problemów produkcyjnych. Logują tylko na poziomach ERROR/WARN i nie zawierają wrażliwych danych.
+
+**Zawartość logowana:** komunikaty wyjątków, liczby rekordów, informacje o statusie zadania.
+
+**Środki zaradcze:** wyjście debug można filtrować za pomocą ustawień Debug Log Salesforce. Brak logowania PII ani poświadczeń.
+
+## Podsumowanie kontroli bezpieczeństwa
+
+| Kontrola | Status | Implementacja |
+|---------|--------|---------------|
+| Sprawdzenia CRUD w kontrolerach | Zaimplementowane | `isAccessible()`, `isCreateable()`, `isUpdateable()`, `isDeletable()` |
+| Egzekwowanie FLS | Zaimplementowane | Permission Sets kontrolują dostęp do pól |
+| Zapobieganie wstrzykiwaniu SOQL | Zaimplementowane | Bind variables dla danych wejściowych użytkownika, whitelist dla nazw obiektów |
+| Model udostępniania | Zaimplementowane | `with sharing` na kontrolerach, `without sharing` tylko tam, gdzie udokumentowane |
+| Walidacja danych wejściowych | Zaimplementowane | Sprawdzenia null, walidacja formatu, reguły biznesowe |
+| Zapobieganie XSS | Zaimplementowane | Framework LWC obsługuje kodowanie wyjścia |
+
+## Integracje zewnętrzne
+
+| Sprawdzenie | Wynik |
+|-------|--------|
+| Wywołania HTTP | Brak — pakiet nie wykonuje wywołań zewnętrznych |
+| Named Credentials | Nie używane |
+| External Objects | Nie używane |
+| Remote Site Settings | Niewymagane |

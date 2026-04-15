@@ -1,0 +1,164 @@
+---
+title: パッケージビルド
+description: FlexibleTeamShareパッケージバージョンをビルドするためのクイックリファレンス。
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+## 前提条件
+
+- Salesforce CLIがインストールされている（`sf`）
+- Dev Hub組織に認証されている
+- 作業ディレクトリ：プロジェクトルート
+
+## Betaパッケージ
+
+### 新しいBetaをビルド
+
+```bash
+sf package version create \
+  --package FlexibleTeamShare \
+  --definition-file config/package-scratch-def.json \
+  --installation-key-bypass \
+  --wait 30 \
+  --code-coverage \
+  --skip-ancestor-check
+```
+
+### Betaをビルド（インストールパスワード付き）
+
+```bash
+sf package version create \
+  --package FlexibleTeamShare \
+  --definition-file config/package-scratch-def.json \
+  --installation-key YOUR_PASSWORD \
+  --wait 30 \
+  --code-coverage \
+  --skip-ancestor-check
+```
+
+<Aside type="caution">
+ビルド組織でTranslation Workbenchが有効になっていることを確認するため、常に`--definition-file config/package-scratch-def.json`を明示的に渡してください。`sfdx-project.json`の`definitionFile`プロパティは常に確実に取得されるとは限りません。
+</Aside>
+
+## Release（プロモート済み）パッケージ
+
+### ステップ1：既存のバージョンを一覧表示
+
+```bash
+sf package version list \
+  --packages FlexibleTeamShare \
+  --order-by CreatedDate \
+  --verbose
+```
+
+### ステップ2：betaをreleaseにプロモート
+
+`04t...`をステップ1の実際のバージョンIDに置き換えます：
+
+```bash
+sf package version promote --package 04tXXXXXXXXXXXXXXX
+```
+
+## 便利なコマンド
+
+### パッケージバージョンの詳細を確認
+
+```bash
+sf package version list \
+  --packages FlexibleTeamShare \
+  --order-by CreatedDate \
+  --verbose
+```
+
+### インストールURLを取得
+
+```bash
+sf package version list \
+  --packages FlexibleTeamShare \
+  --order-by CreatedDate \
+  --verbose --json
+```
+
+`SubscriberPackageVersionId`（`04t`で始まる）を探します。
+
+インストールURL形式：
+```
+https://login.salesforce.com/packaging/installPackage.apexp?p0=04tXXXXXXXXXXXXXXX
+```
+
+### コードカバレッジを確認
+
+```bash
+sf package version report --package 04tXXXXXXXXXXXXXXX --verbose
+```
+
+### 失敗した/不要なバージョンを削除
+
+```bash
+sf package version delete --package 04tXXXXXXXXXXXXXXX --no-prompt
+```
+
+## バージョン番号付け
+
+`sfdx-project.json`で設定：
+
+| フィールド | 例 | 説明 |
+|-------|---------|-------------|
+| `versionNumber` | `1.0.0.NEXT` | MAJOR.MINOR.PATCH.BUILD |
+| `NEXT` | auto | ビルド番号を自動インクリメント |
+
+### バージョンを手動でバンプ
+
+`sfdx-project.json`を編集：
+
+```json
+"versionNumber": "1.1.0.NEXT"
+```
+
+## よくある問題
+
+### 「先祖バージョンが必要です」
+
+`--skip-ancestor-check`フラグを追加するか、`sfdx-project.json`で先祖を設定します。
+
+### 「コードカバレッジが75%未満」
+
+まずローカルでテストを実行：
+
+```bash
+sf apex run test --code-coverage --result-format human --wait 10
+```
+
+### 「翻訳言語が利用できません」
+
+1. `sfdx-project.json`で`definitionFile`が設定されていることを確認
+2. `config/package-scratch-def.json`にEnterpriseエディションと3つすべての言語設定があることを確認：
+
+```json
+{
+  "orgName": "Package Build Org",
+  "edition": "Enterprise",
+  "features": ["EnableSetPasswordInApi"],
+  "settings": {
+    "lightningExperienceSettings": {
+      "enableS1DesktopEnabled": true
+    },
+    "languageSettings": {
+      "enableTranslationWorkbench": true,
+      "enableEndUserLanguages": true,
+      "enablePlatformLanguages": true
+    }
+  }
+}
+```
+
+## クイックリファレンス
+
+| アクション | コマンド |
+|--------|---------|
+| betaをビルド | `sf package version create --package FlexibleTeamShare --definition-file config/package-scratch-def.json --installation-key-bypass --wait 30 --code-coverage --skip-ancestor-check` |
+| バージョンを一覧表示 | `sf package version list --packages FlexibleTeamShare --order-by CreatedDate --verbose` |
+| releaseにプロモート | `sf package version promote --package 04tXXX...` |
+| カバレッジを確認 | `sf package version report --package 04tXXX... --verbose` |
+| バージョンを削除 | `sf package version delete --package 04tXXX... --no-prompt` |

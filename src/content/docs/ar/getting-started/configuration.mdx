@@ -1,0 +1,263 @@
+---
+title: التكوين
+description: تكوين مكونات Flexible Team Share، مزامنة المالك، والمهام المجدولة.
+---
+
+import { Aside, Steps } from '@astrojs/starlight/components';
+
+## تكوين المكون
+
+يمكن تكوين مكون Object Team Member مباشرة في Lightning App Builder بالخصائص التالية:
+
+| الخاصية | النوع | الافتراضي | الوصف |
+|----------|------|---------|-------------|
+| **Card Title** | String | Team Members | العنوان المعروض على بطاقة المكون |
+| **Max Displayed Members** | Integer | 5 | الحد الأقصى لعدد أعضاء الفريق المعروضين قبل الطي. اضبطه على 0 لإظهار الجميع |
+
+عندما يتجاوز عدد أعضاء الفريق الحد المكوّن، تنطوي القائمة وتظهر زر **"Show all (X more)"**. النقر عليه يوسع القائمة الكاملة، مع زر **"Show less"** لطيها مرة أخرى. يظهر مالك السجل دائمًا أولاً في القائمة، بغض النظر عن حد العرض.
+
+![قائمة أعضاء الفريق المطوية](../../../../assets/pictures/team-members-collapsed.png)
+
+![Lightning App Builder — خصائص المكون](../../../../assets/pictures/app-builder-config.png)
+
+### سلوك حد العرض
+
+| الإعداد | السلوك |
+|---------|----------|
+| Max Displayed Members = **5** (افتراضي) | يعرض أول 5 أعضاء، "Show X more" للباقي |
+| Max Displayed Members = **0** | جميع أعضاء الفريق مرئيون، بدون طي/توسيع |
+| Max Displayed Members = **3** (مخصص) | يعرض أول 3 أعضاء، "Show X more" للباقي |
+
+## أدوار أعضاء الفريق
+
+عند إضافة مستخدمين إلى فريق، تقوم بتعيين أحد الأدوار التالية لهم:
+
+| الدور | الوصف | القدرات |
+|------|-------------|-------------|
+| **Owner** | مالك السجل | يتم تعيينه تلقائيًا عند إنشاء سجل. لا يمكن تعيينه أو إزالته يدويًا. لديه وصول كامل لإدارة أعضاء الفريق. يتم حذفه تلقائيًا عندما لا يوجد مستخدمون آخرون في الفريق. |
+| **Manager** | مسؤول الفريق | يمكنه إضافة وتحرير وإزالة أعضاء الفريق. استخدم هذا الدور للمستخدمين الذين يحتاجون لإدارة تكوين الفريق. |
+| **User** | عضو فريق قياسي | يمكنه عرض قائمة أعضاء الفريق ولكن لا يمكنه تعديلها. استخدم هذا الدور للمستخدمين الذين يحتاجون فقط للوصول إلى السجل. |
+
+![مكون Team Members يعرض الأدوار](../../../../assets/pictures/team-members-expanded.png)
+
+<Aside type="note">
+- يتم إنشاء دور **Owner** تلقائيًا من قبل النظام ويمثل مالك السجل الحالي
+- يحصل كلا دوري **Manager** و **User** على وصول للسجل بناءً على مستوى الوصول المعين لهم (Read Only أو Read/Write)
+- يمكن فقط للمستخدمين ذوي أدوار **Owner** أو **Manager** إضافة أو تحرير أو إزالة أعضاء الفريق
+</Aside>
+
+## مزامنة تغيير المالك
+
+عندما يتغير مالك السجل (مثل إعادة تعيين حساب Account لمندوب مبيعات آخر)، **لا يتم** تحديث عضو فريق Owner تلقائيًا. ينشئ النظام سجل Owner عند إضافة أول عضو فريق، لكنه لا يتتبع تغييرات المالك اللاحقة على السجل الأصلي.
+
+للحفاظ على مزامنة Owner في الفريق مع مالك السجل، تحتاج لإنشاء **Record-Triggered Flow**.
+
+<Aside type="note" title="لماذا هذا ليس تلقائيًا؟">
+لا يمكن للحزم المدارة من Salesforce أن تتضمن triggers على الكائنات القياسية مثل Account أو Opportunity. يوفر Flexible Team Share **Invocable Action** يمكنك استدعاءه من Flow لمزامنة المالك عند الحاجة.
+</Aside>
+
+### الإعداد عبر Flow (موصى به)
+
+<Steps>
+1. انتقل إلى **Setup** > **Flows**
+2. انقر على **New Flow** > **Record-Triggered Flow**
+3. حدد الكائن (مثل Account)
+4. كوّن المشغل: **"A record is updated"**
+5. أضف Entry Condition: Formula > `ISCHANGED({!$Record.OwnerId})` evaluates to `true`
+6. اضبط **"When to Run the Flow"** على **"After the record is saved"**
+7. أضف عنصر **Action**
+8. ابحث عن **"Sync Team Member Owner"**
+9. اضبط معامل **"Record ID"** على `{!$Record.Id}`
+10. اترك **"Object API Name"** فارغًا (يتم اشتقاقه تلقائيًا من Record ID)
+11. احفظ وقم بـ **Activate** الـ Flow
+</Steps>
+
+![Flow Builder - Owner Sync Flow](../../../../assets/pictures/flow-builder-owner-sync.png)
+![تكوين إجراء Sync Team Member Owner](../../../../assets/pictures/sync-owner-action-config.png)
+
+<Aside type="tip">
+كرر هذه الخطوات لكل كائن تريد مزامنة المالك التلقائية عليه (مثل Account، Opportunity، Case، Lead).
+</Aside>
+
+### الإعداد عبر Apex Trigger
+
+```apex
+trigger AccountOwnerSync on Account(after update) {
+  List<tucariofts.SyncOwnerInvocable.SyncOwnerRequest> requests =
+    new List<tucariofts.SyncOwnerInvocable.SyncOwnerRequest>();
+
+  for (Account acc : Trigger.new) {
+    Account oldAcc = Trigger.oldMap.get(acc.Id);
+    if (acc.OwnerId != oldAcc.OwnerId) {
+      tucariofts.SyncOwnerInvocable.SyncOwnerRequest req =
+        new tucariofts.SyncOwnerInvocable.SyncOwnerRequest();
+      req.recordId = acc.Id;
+      requests.add(req);
+    }
+  }
+
+  if (!requests.isEmpty()) {
+    tucariofts.SyncOwnerInvocable.syncOwners(requests);
+  }
+}
+```
+
+### الاستدعاء من كود Apex (سجل واحد)
+
+```apex
+tucariofts.SyncOwnerInvocable.SyncOwnerRequest request =
+    new tucariofts.SyncOwnerInvocable.SyncOwnerRequest();
+request.recordId = accountId;
+
+List<tucariofts.SyncOwnerInvocable.SyncOwnerResult> results =
+    tucariofts.SyncOwnerInvocable.syncOwners(
+        new List<tucariofts.SyncOwnerInvocable.SyncOwnerRequest>{ request }
+    );
+
+if (results[0].success) {
+    System.debug('Owner synced: ' + results[0].oldOwnerId +
+                 ' → ' + results[0].newOwnerId);
+} else {
+    System.debug('Sync failed: ' + results[0].message);
+}
+```
+
+### كائن النتيجة
+
+| الحقل | النوع | الوصف |
+|-------|------|-------------|
+| `success` | Boolean | هل نجحت المزامنة |
+| `message` | String | رسالة النتيجة أو تفاصيل الخطأ |
+| `oldOwnerId` | Id | معرف المستخدم للمالك السابق |
+| `newOwnerId` | Id | معرف المستخدم للمالك الجديد |
+
+### سيناريوهات الخطأ
+
+| السيناريو | النتيجة |
+|----------|--------|
+| لا يوجد أعضاء فريق على السجل | `success = false`، "No Owner team member found" |
+| المالك لم يتغير | `success = true`، "Owner unchanged, no update needed" |
+| Record ID null | `success = false`، "Record ID is required" |
+| معرف سجل غير صالح | `success = false`، رسالة خطأ |
+
+### قيود مهمة
+
+**Queues كمالكين غير مدعومة** — لا يدعم Flexible Team Share Queues كمالكي فريق. عندما يكون السجل مملوكًا لـ Queue:
+
+- يستخدم النظام **المستخدم الحالي** (الشخص الذي يضيف أول عضو فريق) كـ Owner في الفريق
+- إذا قمت لاحقًا بتغيير مالك السجل من Queue إلى User، قم بتشغيل إجراء Sync Owner لتحديث الفريق
+- إذا قمت بتغيير المالك من User إلى Queue، سيبقى Owner في الفريق كالمستخدم السابق
+
+**يجب إنشاء Flow لكل كائن** — تحتاج لإنشاء Flow منفصل لكل نوع كائن تريد مزامنة المالك عليه. يعمل Invocable Action مع أي كائن، لكن Salesforce يتطلب Record-Triggered Flows منفصلة لكل كائن.
+
+## الوصول المؤقت مع تاريخ الانتهاء
+
+عند إضافة عضو فريق، يمكنك اختياريًا تعيين **End Date** لمنح وصول مؤقت لسجل. هذا مفيد لـ:
+
+- التعاون القائم على المشاريع مع جداول زمنية محددة
+- الاستشاريين أو المقاولين المؤقتين
+- تغطية الإجازات أو المسؤوليات المفوضة
+- فترات المراجعة أو التدقيق
+
+### كيف يعمل
+
+<Steps>
+1. عند إضافة أو تحرير عضو فريق، اضبط حقل **End Date** على آخر يوم يجب أن يكون لديه وصول
+2. يحتفظ عضو الفريق بالوصول الكامل حتى نهاية ذلك اليوم
+3. بعد مرور End Date، تقوم مهمة التنظيف المجدولة تلقائيًا بإزالة عضو الفريق وإلغاء وصوله
+</Steps>
+
+![عضو فريق مع End Date](../../../../assets/pictures/team-members-end-date.png)
+
+### عملية التنظيف التلقائية
+
+- تعمل مهمة batch المجدولة يوميًا (افتراضيًا في الساعة 2:00 صباحًا) لإزالة أعضاء الفريق منتهي الصلاحية
+- عند إزالة عضو فريق، يتم أيضًا حذف سجل المشاركة الخاص به، مما يلغي الوصول إلى السجل
+- يمكن إدارة مهمة التنظيف من معالج التكوين
+
+![إدارة المهمة المجدولة](../../../../assets/pictures/install-guide-14.png)
+
+## المهمة المجدولة
+
+يتضمن Flexible Team Share مهمة تنظيف تلقائية تزيل أعضاء الفريق منتهي الصلاحية. يتم جدولة هذه المهمة تلقائيًا أثناء تثبيت الحزمة.
+
+### التحقق من المهمة
+
+<Steps>
+1. انتقل إلى **Setup** > **Scheduled Jobs**
+2. ابحث عن **Flexible Team Share - Expired Member Cleanup**
+3. تحقق من أن المهمة مجدولة للتشغيل يوميًا
+</Steps>
+
+![Scheduled Jobs في Setup](../../../../assets/pictures/install-guide-20.png)
+
+### إدارة المهمة اليدوية
+
+يمكن للمسؤولين إدارة مهمة التنظيف من معالج التكوين:
+
+- **Schedule Job** — جدولة يدويًا إذا لم تكن قيد التشغيل
+- **Unschedule Job** — إيقاف التنظيف التلقائي
+- **Run Now** — تنفيذ التنظيف فورًا
+
+## استكشاف الأخطاء وإصلاحها
+
+### تحذير "Configuration Not Found"
+
+**العرض:** يظهر نافذة تحذير منبثقة تنص على عدم وجود تكوين لهذا الكائن.
+
+**السبب:** تمت إضافة مكون Team Member إلى صفحة سجل قبل تكوين الكائن في معالج التكوين.
+
+**الحل:**
+<Steps>
+1. انتقل إلى معالج التكوين (تطبيق Flexible Team Share > Configuration)
+2. أضف وانشر تكوينًا لهذا الكائن
+3. ارجع إلى صفحة السجل — يجب أن يعمل المكون الآن بشكل صحيح
+</Steps>
+
+![تحذير Configuration Not Found](../../../../assets/pictures/install-guide-15.png)
+
+### خطأ "No Access"
+
+**العرض:** يعرض المكون رسالة "No Access" مع أيقونة قفل بدلاً من أعضاء الفريق.
+
+**السبب:** المستخدم الحالي ليس لديه Permission Set Group المطلوب معينًا.
+
+**الحل:**
+<Steps>
+1. انتقل إلى **Setup** > **Permission Set Groups**
+2. قم بتعيين **Admin** أو **User** Permission Set Group للمستخدمين المتأثرين
+3. قد يحتاج المستخدمون لتسجيل الخروج وإعادة تسجيل الدخول لتطبيق التغييرات
+</Steps>
+
+![خطأ No Access](../../../../assets/pictures/install-guide-16.png)
+
+### تحذير "Limit Reached"
+
+**العرض:** زر "Add Team Member" معطل ورسالة تشير إلى الوصول للحد الأقصى.
+
+**السبب:** لقد وصلت إلى الحد الأقصى لعدد أعضاء الفريق المسموح به.
+
+**الحل:** قم بإزالة أعضاء الفريق غير النشطين أو غير الضروريين لتحرير المساحات.
+
+| أعضاء الفريق ضمن الحد | أعضاء الفريق تجاوزوا الحد |
+|:-----|:-----|
+| ![ضمن الحد](../../../../assets/pictures/install-guide-17.png) | ![تجاوز الحد](../../../../assets/pictures/install-guide-18.png) |
+
+![تفاصيل تحذير الوصول للحد](../../../../assets/pictures/install-guide-19.png)
+
+### المشاركة لا تعمل
+
+**العرض:** تتم إضافة أعضاء الفريق بنجاح لكنهم لا يستطيعون الوصول إلى السجل.
+
+**السبب:** إعداد المشاركة الافتراضي على مستوى المؤسسة (OWD) للكائن معين على Public Read/Write.
+
+**الحل:**
+<Steps>
+1. انتقل إلى **Setup** > **Sharing Settings**
+2. قم بتغيير OWD للكائن إلى **Private** أو **Public Read Only**
+3. ملاحظة: تغيير إعدادات OWD قد يؤثر على وصول المستخدمين الآخرين — استشر مسؤول Salesforce الخاص بك
+</Steps>
+
+## الدعم
+
+للأسئلة أو المشاكل، يرجى الاتصال بـ [support@tucario.com](mailto:support@tucario.com).

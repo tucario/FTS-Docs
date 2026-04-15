@@ -1,0 +1,30 @@
+---
+title: Tareas de Administrador
+description: Casos de uso de seguridad y administración para Flexible Team Share.
+---
+
+## Caso de Uso 8: Acceso Sin Permission Set
+
+### Objetivo
+
+Verificar el comportamiento cuando el usuario carece de los permisos requeridos.
+
+### Requisitos Previos
+
+- Usuario SIN el Permission Set FTS_Data_Access
+- Página de registro con el componente Object Team
+
+### Pasos
+
+| Paso | Acción | Resultado Esperado |
+|------|--------|----------------|
+| 1 | Abrir página de registro | La página carga |
+| 2 | Ver el componente Object Team | Se muestra mensaje de error |
+
+![Access Required error](../../../../assets/pictures/access-required.png)
+
+### Puntos de Validación
+
+- [ ] Mensaje de error claro sobre acceso faltante
+- [ ] No se exponen datos
+- [ ] Sin errores/excepciones del sistema

@@ -1,0 +1,140 @@
+---
+title: Configuración Inicial
+description: Casos de uso de administrador para la configuración inicial de Flexible Team Share.
+---
+
+import { Aside, Steps } from '@astrojs/starlight/components';
+
+## Caso de Uso 1: Configuración Inicial (Admin)
+
+### Objetivo
+
+Configurar Flexible Team Share para el primer uso en la organización.
+
+### Requisitos Previos
+
+- Perfil System Administrator
+- Permission Set FTS_App_Access asignado
+
+### Pasos
+
+| Paso | Acción | Resultado Esperado |
+|------|--------|----------------|
+| 1 | Navegar al App Launcher | La búsqueda muestra la aplicación "FlexiTeam" |
+| 2 | Abrir aplicación FlexiTeam | Carga la página de inicio de FlexiTeam |
+| 3 | Hacer clic en la pestaña "Configuration Wizard" | El asistente muestra dos secciones |
+| 4 | En "Object Configuration", hacer clic en "Add Object" | Se abre modal con objetos disponibles |
+| 5 | Seleccionar "Case" del menú desplegable | Se selecciona el objeto Case |
+| 6 | Hacer clic en "Save" | Configuración guardada, Case aparece en la lista como Activo |
+| 7 | (Opcional) Programar trabajo de limpieza | Trabajo programado, se muestra la próxima hora de ejecución |
+
+![Configuration Wizard](../../../../assets/pictures/config-wizard.png)
+
+### Puntos de Validación
+
+- [ ] Solo aparecen objetos con OWD Private/Public Read Only en el menú desplegable
+- [ ] Los objetos ya configurados no aparecen en el menú desplegable
+- [ ] El interruptor Active funciona correctamente
+- [ ] El trabajo de limpieza puede programarse/desprogramarse
+
+---
+
+## Caso de Uso 7: Desactivar Configuración de Objeto (Admin)
+
+### Objetivo
+
+Deshabilitar el uso compartido de equipo para un objeto y eliminar los usos compartidos existentes.
+
+### Requisitos Previos
+
+- Objeto ya configurado y activo
+- Existen miembros del equipo para este objeto
+
+### Pasos
+
+| Paso | Acción | Resultado Esperado |
+|------|--------|----------------|
+| 1 | Abrir el Asistente de Configuración | Lista de configuración visible |
+| 2 | Alternar el interruptor "Active" desactivado para Case | Cuadro de diálogo de confirmación |
+| 3 | Confirmar desactivación | El estado cambia a inactivo |
+| 4 | Verificar equipos de Case existentes | Los miembros del equipo permanecen pero se eliminan los usos compartidos |
+
+### Puntos de Validación
+
+- [ ] Se ejecuta el trabajo por lotes para eliminar registros compartidos
+- [ ] Los registros de miembros del equipo se conservan
+- [ ] Se puede reactivar más tarde (los usos compartidos se recrean)
+- [ ] Se muestra advertencia sobre eliminación de usos compartidos
+
+---
+
+## Caso de Uso 9: Ejecución Manual de Limpieza (Admin)
+
+### Objetivo
+
+Disparar manualmente la limpieza de miembros del equipo vencidos.
+
+### Requisitos Previos
+
+- Acceso de administrador
+- Existen miembros del equipo vencidos (End_Date__c en el pasado)
+
+### Pasos
+
+| Paso | Acción | Resultado Esperado |
+|------|--------|----------------|
+| 1 | Abrir el Asistente de Configuración | Sección Scheduled Jobs visible |
+| 2 | Ver el conteo "Expired Members" | Muestra el número de registros vencidos |
+| 3 | Hacer clic en "Run Cleanup Now" | Inicia el trabajo por lotes |
+| 4 | Actualizar la página | El conteo de vencidos se reduce a 0 |
+
+### Puntos de Validación
+
+- [ ] El conteo de vencidos es preciso
+- [ ] El trabajo por lotes se completa exitosamente
+- [ ] Los miembros vencidos se eliminan
+- [ ] Los registros compartidos asociados se eliminan
+
+---
+
+## Caso de Uso 11: Configurar Visualización del Componente (Admin)
+
+### Objetivo
+
+Personalizar la apariencia del componente Object Team Member: cambiar el título de la tarjeta y establecer el número máximo de miembros del equipo mostrados.
+
+### Requisitos Previos
+
+- Perfil System Administrator
+- Acceso a Lightning App Builder
+
+### Pasos
+
+| Paso | Acción | Resultado Esperado |
+|------|--------|----------------|
+| 1 | Abrir página de registro en Lightning App Builder | Se carga el editor de página |
+| 2 | Hacer clic en el componente "Team Members" | Se abre el panel de propiedades del componente a la derecha |
+| 3 | Cambiar "Card Title" a valor personalizado | Se actualiza la vista previa del título |
+| 4 | Establecer "Max Displayed Members" al número deseado | Límite de visualización configurado |
+| 5 | Guardar y activar la página | Cambios aplicados |
+| 6 | Abrir un registro con miembros del equipo | El componente muestra el título configurado y respeta el límite de visualización |
+
+![Lightning App Builder configuration](../../../../assets/pictures/app-builder-config.png)
+
+### Opciones de Configuración
+
+| Configuración | Valores | Comportamiento |
+|---------|--------|----------|
+| Max Displayed Members = 5 | Predeterminado | Muestra los primeros 5 miembros, "Show X more" para el resto |
+| Max Displayed Members = 0 | Mostrar todos | Todos los miembros del equipo visibles, sin contraer/expandir |
+| Max Displayed Members = 3 | Límite personalizado | Muestra los primeros 3 miembros, "Show X more" para el resto |
+
+### Puntos de Validación
+
+- [ ] Los cambios en el título de la tarjeta se reflejan en la página de registro
+- [ ] Se respeta el límite de visualización (número correcto de miembros mostrados)
+- [ ] Aparece el botón "Show X more" cuando los miembros exceden el límite
+- [ ] Establecer límite en 0 muestra todos los miembros sin botón de contraer
+- [ ] El propietario del registro siempre aparece primero independientemente del límite
+- [ ] El botón "Show less" contrae la lista de vuelta al límite configurado
+- [ ] Los cambios persisten después de recargar la página

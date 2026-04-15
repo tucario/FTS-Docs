@@ -1,0 +1,77 @@
+---
+title: "v1.0"
+description: Notes de version de Flexible Team Share v1.0 — version initiale.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+**Date de version :** Février 2026
+
+Il s'agit de la version initiale de Flexible Team Share, un package géré Salesforce qui étend la fonctionnalité native Account Team Member pour fonctionner avec n'importe quel objet Salesforce.
+
+## Fonctionnalités
+
+### Appartenance d'équipe universelle
+
+Ajoutez des membres d'équipe à n'importe quel objet Salesforce — pas seulement aux comptes. Créez des équipes collaboratives sur des enregistrements à travers des objets standard et personnalisés avec partage automatique d'enregistrements basé sur l'appartenance à l'équipe.
+
+**Objets standard pris en charge :** Account, Contact, Case, Lead, Opportunity, Campaign, Order
+
+**Objets personnalisés :** Tout objet personnalisé avec OWD Private ou Public Read Only est pris en charge.
+
+### Partage automatique d'enregistrements
+
+Lorsqu'un membre d'équipe est ajouté, les enregistrements de partage sont automatiquement créés pour donner à l'utilisateur un accès approprié à l'enregistrement parent. Les partages sont mis à jour lorsque les niveaux d'accès changent et supprimés lorsque les membres d'équipe sont supprimés. Toutes les opérations de partage s'exécutent de manière asynchrone via Queueable Apex pour l'évolutivité.
+
+### Contrôle d'accès basé sur les rôles
+
+Trois rôles de membre d'équipe avec des capacités distinctes :
+
+| Rôle | Description |
+|------|-------------|
+| **Owner** | Attribué automatiquement au propriétaire de l'enregistrement. Accès complet à la gestion de l'équipe. |
+| **Manager** | Peut ajouter, modifier et supprimer des membres d'équipe. Délègue la gestion de l'équipe. |
+| **User** | Peut voir les membres d'équipe mais ne peut pas modifier l'équipe. Accès en lecture/modification à l'enregistrement. |
+
+### Affectations d'équipe temporaires
+
+Définissez une **End Date** sur les membres d'équipe pour un accès à durée limitée. Une tâche batch planifiée s'exécute quotidiennement pour nettoyer les appartenances expirées et révoquer l'accès automatiquement.
+
+### Synchronisation du changement de propriétaire
+
+L'Invocable Action `SyncOwnerInvocable` maintient le propriétaire de l'équipe synchronisé lorsque le propriétaire de l'enregistrement parent change. Appelable depuis Flow ou Apex, entièrement bulkifié. Prend en charge tous les objets configurés.
+
+### Assistant de configuration
+
+Interface utilisateur administrateur pour activer le partage d'équipe sur une base par objet. Basculez les configurations actives/inactives, planifiez les tâches de nettoyage et gérez les paramètres d'objet, le tout depuis une seule interface.
+
+### Composant personnalisable
+
+Le composant LWC Object Team Member est configurable dans Lightning App Builder :
+
+- **Card Title** — titre personnalisé pour la carte du composant
+- **Max Displayed Members** — liste réductible avec limite configurable (par défaut : 5)
+
+### Internationalisation
+
+35 langues prises en charge via Custom Labels et Translation Workbench.
+
+## Ensembles de permissions
+
+| Permission Set | Audience | Description |
+|---------------|----------|-------------|
+| **FTS_App_Access** | Administrateurs | Accès administrateur complet — application, onglets, toutes les classes Apex, CRUD complet + MAR |
+| **FTS_Data_Access** | Utilisateurs finaux | Accès utilisateur — CRUD de base sur les membres d'équipe, classes Apex contrôleur |
+
+## Exigences
+
+- Salesforce **Enterprise Edition** ou supérieur
+- Les objets doivent avoir un OWD **Private** ou **Public Read Only**
+- **Namespace :** `tucariofts`
+- **Version API :** 65.0
+
+## Limitations connues
+
+- La synchronisation du propriétaire nécessite un Record-Triggered Flow par objet (les packages gérés ne peuvent pas inclure de déclencheurs sur les objets standard)
+- Les propriétaires de file d'attente ne sont pas pris en charge en tant que membres d'équipe (utilise l'utilisateur en cours d'exécution à la place)
+- La limite maximale de membres d'équipe est appliquée par configuration d'objet

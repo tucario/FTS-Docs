@@ -1,0 +1,77 @@
+---
+title: "v1.0"
+description: Notas de versão do Flexible Team Share v1.0 — lançamento inicial.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+**Data de Lançamento:** Fevereiro de 2026
+
+Este é o lançamento inicial do Flexible Team Share, um pacote gerenciado Salesforce que estende a funcionalidade nativa de Account Team Member para funcionar com qualquer objeto Salesforce.
+
+## Funcionalidades
+
+### Associação Universal de Equipe
+
+Adicione membros da equipe a qualquer objeto Salesforce — não apenas Contas. Crie equipes colaborativas em registros através de objetos padrão e personalizados com compartilhamento automático de registros baseado em associação de equipe.
+
+**Objetos padrão suportados:** Account, Contact, Case, Lead, Opportunity, Campaign, Order
+
+**Objetos personalizados:** Qualquer objeto personalizado com OWD Private ou Public Read Only é suportado.
+
+### Compartilhamento Automático de Registros
+
+Quando um membro da equipe é adicionado, registros de compartilhamento são automaticamente criados para dar ao usuário acesso apropriado ao registro pai. Compartilhamentos são atualizados quando níveis de acesso mudam e removidos quando membros da equipe são excluídos. Todas as operações de compartilhamento executam assincronamente via Queueable Apex para escalabilidade.
+
+### Controle de Acesso Baseado em Funções
+
+Três funções de membro da equipe com capacidades distintas:
+
+| Função | Descrição |
+|------|-------------|
+| **Owner** | Atribuído automaticamente ao owner do registro. Acesso completo ao gerenciamento de equipe. |
+| **Manager** | Pode adicionar, editar e remover membros da equipe. Delega gerenciamento de equipe. |
+| **User** | Pode visualizar membros da equipe mas não pode modificar a equipe. Acesso de leitura/edição ao registro. |
+
+### Atribuições Temporárias de Equipe
+
+Defina uma **End Date** em membros da equipe para acesso com prazo limitado. Um scheduled batch job executa diariamente para limpar associações expiradas e revogar acesso automaticamente.
+
+### Sincronização de Mudança de Owner
+
+A Invocable Action `SyncOwnerInvocable` mantém o Owner da equipe sincronizado quando o owner do registro pai muda. Chamável de Flow ou Apex, totalmente bulkificado. Suporta todos os objetos configurados.
+
+### Configuration Wizard
+
+UI de Admin para habilitar compartilhamento de equipe por objeto. Alterne configurações ativas/inativas, agende cleanup jobs e gerencie configurações de objeto tudo de uma interface.
+
+### Componente Personalizável
+
+O componente LWC Object Team Member é configurável no Lightning App Builder:
+
+- **Card Title** — título personalizado para o cartão do componente
+- **Max Displayed Members** — lista colapsável com limite configurável (padrão: 5)
+
+### Internacionalização
+
+35 idiomas suportados via Custom Labels e Translation Workbench.
+
+## Permission Sets
+
+| Permission Set | Público | Descrição |
+|---------------|----------|-------------|
+| **FTS_App_Access** | Administradores | Acesso completo de admin — app, abas, todas as classes Apex, CRUD completo + MAR |
+| **FTS_Data_Access** | Usuários Finais | Acesso de usuário — CRUD básico em membros da equipe, classes Apex controller |
+
+## Requisitos
+
+- Salesforce **Enterprise Edition** ou superior
+- Objetos devem ter OWD **Private** ou **Public Read Only**
+- **Namespace:** `tucariofts`
+- **API Version:** 65.0
+
+## Limitações Conhecidas
+
+- Sincronização de owner requer um Record-Triggered Flow por objeto (pacotes gerenciados não podem incluir triggers em objetos padrão)
+- Queue owners não são suportados como membros da equipe (usa usuário em execução)
+- Limite máximo de membros da equipe é aplicado por configuração de objeto

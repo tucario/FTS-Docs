@@ -1,0 +1,213 @@
+---
+title: Team verwalten
+description: Use Cases für das Hinzufügen, Bearbeiten, Entfernen und Anzeigen von Teammitgliedern.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+## Use Case 2: Teammitglied zu Datensatz hinzufügen (Manager)
+
+### Ziel
+
+Ein Teammitglied mit Read/Write-Zugriff zu einem Case-Datensatz hinzufügen.
+
+### Voraussetzungen
+
+- Benutzer hat FTS_Data_Access Permission Set
+- Case-Objekt ist für Team-Freigabe konfiguriert
+- Benutzer ist Datensatzbesitzer ODER hat Manager-Rolle beim Datensatz
+
+### Schritte
+
+| Schritt | Aktion | Erwartetes Ergebnis |
+|------|--------|----------------|
+| 1 | Case-Datensatz öffnen | Case-Detailseite lädt |
+| 2 | "Object Team"-Komponente finden | Komponente zeigt "No team members" oder vorhandene Liste |
+| 3 | Auf "Add"-Schaltfläche (+) klicken | Add Team Member-Modal öffnet sich |
+| 4 | Nach Benutzer "Test User" suchen | Benutzer erscheint in Suche |
+| 5 | Benutzer auswählen | User-ID ausgefüllt |
+| 6 | Access Level auf "Read/Write" setzen | Zugriffsebene ausgewählt |
+| 7 | Role auf "User" setzen | Rolle ausgewählt |
+| 8 | (Optional) End Date auf zukünftiges Datum setzen | Enddatum gesetzt |
+| 9 | Auf "Add" klicken | Modal schließt sich, Benutzer erscheint in Teamliste |
+
+![Add Team Member-Modal](../../../../assets/pictures/add-team-member-modal.png)
+
+### Validierungspunkte
+
+- [ ] Benutzersuche zeigt Foto und E-Mail
+- [ ] Zugriffsebenenoptionen: Read Only, Read/Write
+- [ ] Rollenoptionen: Manager, User (Owner nicht wählbar)
+- [ ] Enddatum muss zukünftig sein (Validierungsfehler bei Vergangenheit)
+- [ ] Doppeltes Mitglied zeigt Fehlermeldung
+- [ ] Freigabedatensatz für Case erstellt (über Setup > Sharing überprüfen)
+
+---
+
+## Use Case 3: Teammitglied bearbeiten (Manager)
+
+### Ziel
+
+Zugriffsebene eines Teammitglieds von Read/Write auf Read Only ändern.
+
+### Voraussetzungen
+
+- Teammitglied existiert beim Datensatz
+- Aktueller Benutzer hat Manager-Berechtigungen
+
+### Schritte
+
+| Schritt | Aktion | Erwartetes Ergebnis |
+|------|--------|----------------|
+| 1 | Datensatz mit Teammitgliedern öffnen | Teammitgliederliste sichtbar |
+| 2 | Auf Menüsymbol (&#8942;) in Teammitgliederzeile klicken | Dropdown zeigt Edit/Delete-Optionen |
+| 3 | Auf "Edit" klicken | Edit-Modal öffnet sich mit aktuellen Werten |
+| 4 | Access Level auf "Read Only" ändern | Neuer Wert ausgewählt |
+| 5 | Auf "Save" klicken | Modal schließt sich, Zugriffsebene aktualisiert |
+
+![Edit Team Member-Modal](../../../../assets/pictures/edit-team-member-modal.png)
+
+### Validierungspunkte
+
+- [ ] Ursprüngliche Werte im Edit-Formular vorausgefüllt
+- [ ] Benutzer kann nicht geändert werden (schreibgeschützt)
+- [ ] Zugriffsebene des Freigabedatensatzes entsprechend aktualisiert
+- [ ] Erfolgs-Toast-Nachricht angezeigt
+
+---
+
+## Use Case 4: Teammitglied entfernen (Manager)
+
+### Ziel
+
+Ein Teammitglied aus einem Datensatz entfernen.
+
+### Voraussetzungen
+
+- Teammitglied existiert beim Datensatz
+- Aktueller Benutzer hat Manager-Berechtigungen
+
+### Schritte
+
+| Schritt | Aktion | Erwartetes Ergebnis |
+|------|--------|----------------|
+| 1 | Datensatz mit Teammitgliedern öffnen | Teammitgliederliste sichtbar |
+| 2 | Auf Menüsymbol (&#8942;) in Teammitgliederzeile klicken | Dropdown zeigt Edit/Delete-Optionen |
+| 3 | Auf "Delete" klicken | Bestätigungsmodal öffnet sich |
+| 4 | Auf "Delete" klicken zur Bestätigung | Modal schließt sich, Mitglied aus Liste entfernt |
+
+![Delete-Bestätigungsdialog](../../../../assets/pictures/delete-confirmation.png)
+
+### Validierungspunkte
+
+- [ ] Bestätigung zeigt Mitgliedsnamen
+- [ ] Freigabedatensatz für übergeordnetes Objekt gelöscht
+- [ ] Erfolgs-Toast-Nachricht angezeigt
+- [ ] Mitglied erscheint nicht mehr in Liste
+
+---
+
+## Use Case 5: Team anzeigen (Endbenutzer)
+
+### Ziel
+
+Teammitglieder bei einem Datensatz anzeigen, bei dem der Benutzer Teammitglied ist.
+
+### Voraussetzungen
+
+- Benutzer hat FTS_Data_Access Permission Set
+- Benutzer ist Teammitglied beim Datensatz
+
+### Schritte
+
+| Schritt | Aktion | Erwartetes Ergebnis |
+|------|--------|----------------|
+| 1 | Datensatz öffnen, bei dem Benutzer Teammitglied ist | Datensatz-Detailseite lädt |
+| 2 | "Object Team"-Komponente anzeigen | Teammitgliederliste sichtbar |
+| 3 | Eigenen Eintrag in Liste anzeigen | Zeigt Name, Foto, Rolle, Zugriffsebene |
+| 4 | Falls mehr als 5 Mitglieder, auf "Show X more" klicken | Vollständige Liste erweitert sich |
+| 5 | Auf "Show less" klicken | Liste klappt zurück auf 5 Mitglieder |
+
+![Eingeklappte Teammitgliederliste](../../../../assets/pictures/team-members-collapsed.png)
+
+### Validierungspunkte
+
+- [ ] Benutzer kann Teammitglieder sehen
+- [ ] Add/Edit/Delete-Schaltflächen NICHT sichtbar (außer Benutzer ist Manager)
+- [ ] Owner-Rollenmitglied mit Badge angezeigt
+- [ ] Enddatum angezeigt, falls gesetzt
+- [ ] Falls mehr als 5 Mitglieder, ist Liste mit "Show X more"-Schaltfläche eingeklappt
+- [ ] Klick auf "Show X more" erweitert vollständige Liste
+- [ ] Klick auf "Show less" klappt Liste zurück
+- [ ] Datensatzbesitzer erscheint immer zuerst in der Liste
+
+---
+
+## Use Case 6: Temporäre Teamzuweisung
+
+### Ziel
+
+Ein Teammitglied mit Ablaufdatum für temporären Zugriff hinzufügen.
+
+### Voraussetzungen
+
+- Manager-Berechtigungen beim Datensatz
+- Cleanup-Job geplant (optional, aber empfohlen)
+
+### Schritte
+
+| Schritt | Aktion | Erwartetes Ergebnis |
+|------|--------|----------------|
+| 1 | Teammitglied hinzufügen (Use Case 2) | Modal offen |
+| 2 | End Date auf 7 Tage ab jetzt setzen | Datum ausgewählt |
+| 3 | Speichern | Mitglied mit angezeigtem Enddatum hinzugefügt |
+| 4 | Warten bis Enddatum vergangen ist | — |
+| 5 | Cleanup-Job läuft (2:00 Uhr) | Mitglied automatisch entfernt |
+
+![Teammitglied mit Enddatum](../../../../assets/pictures/team-members-end-date.png)
+
+### Validierungspunkte
+
+- [ ] Enddatum in Teammitgliederliste angezeigt
+- [ ] Vergangenes Enddatum nicht erlaubt (Validierungsfehler)
+- [ ] Abgelaufene Mitglieder durch Batch-Job bereinigt
+- [ ] Freigabedatensätze entfernt, wenn Mitglied gelöscht wird
+
+---
+
+## Use Case 10: Owner-Änderungs-Synchronisierung
+
+### Ziel
+
+Automatisches Aktualisieren des Team-Owners, wenn sich der Owner des übergeordneten Datensatzes ändert.
+
+### Hintergrund
+
+Wenn sich das Feld `OwnerId` eines Datensatzes ändert (z. B. Account einem anderen Vertriebsmitarbeiter zugewiesen), muss der `ObjectTeamMember__c`-Datensatz mit `Role__c = 'Owner'` aktualisiert werden, um den neuen Owner widerzuspiegeln. Dies ist nicht automatisch — es erfordert einen Flow oder Apex-Trigger.
+
+### Voraussetzungen
+
+- Team-Freigabe für das Objekt konfiguriert
+- Teammitglieder existieren bei Datensätzen (Owner-Rolle automatisch erstellt)
+- Admin-Zugriff zum Erstellen von Flows
+
+### Einrichtung über Flow (empfohlen)
+
+Siehe den [Konfigurationsleitfaden](/de/getting-started/configuration/#owner-change-synchronization) für detaillierte Einrichtungsanweisungen.
+
+![Flow Builder - Owner Sync Flow](../../../../assets/pictures/flow-builder-owner-sync.png)
+![Sync Team Member Owner-Aktion](../../../../assets/pictures/sync-owner-action-config.png)
+
+### Validierungspunkte
+
+- [ ] Flow wird nur ausgelöst, wenn sich OwnerId ändert
+- [ ] ObjectTeamMember__c mit Role='Owner' auf neuen Owner aktualisiert
+- [ ] Freigabedatensatz des alten Owners entfernt (falls nicht noch Teammitglied)
+- [ ] Freigabedatensatz des neuen Owners erstellt
+- [ ] Queue-Owner behandelt (verwendet laufenden Benutzer)
+- [ ] Bulk-Operationen unterstützt (mehrere Datensätze gleichzeitig)
+
+### Unterstützte Objekte
+
+- Account, Opportunity, Case, Lead, Campaign, Order
+- Jedes benutzerdefinierte Objekt mit aktivierter Team-Freigabe

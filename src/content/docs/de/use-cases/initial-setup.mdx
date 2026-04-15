@@ -1,0 +1,140 @@
+---
+title: Ersteinrichtung
+description: Admin-Use-Cases für die erste Konfiguration von Flexible Team Share.
+---
+
+import { Aside, Steps } from '@astrojs/starlight/components';
+
+## Use Case 1: Ersteinrichtung (Admin)
+
+### Ziel
+
+Flexible Team Share für die erste Verwendung in der Organisation konfigurieren.
+
+### Voraussetzungen
+
+- System Administrator-Profil
+- FTS_App_Access Permission Set zugewiesen
+
+### Schritte
+
+| Schritt | Aktion | Erwartetes Ergebnis |
+|------|--------|----------------|
+| 1 | Zum App Launcher navigieren | Suche zeigt "FlexiTeam"-App an |
+| 2 | FlexiTeam-App öffnen | FlexiTeam-Startseite lädt |
+| 3 | Auf Registerkarte "Configuration Wizard" klicken | Wizard wird mit zwei Abschnitten angezeigt |
+| 4 | In "Object Configuration" auf "Add Object" klicken | Modal öffnet sich mit verfügbaren Objekten |
+| 5 | "Case" aus Dropdown auswählen | Case-Objekt ausgewählt |
+| 6 | Auf "Save" klicken | Konfiguration gespeichert, Case erscheint in Liste als Active |
+| 7 | (Optional) Cleanup-Job planen | Job geplant, nächste Laufzeit angezeigt |
+
+![Configuration Wizard](../../../../assets/pictures/config-wizard.png)
+
+### Validierungspunkte
+
+- [ ] Nur Objekte mit Private/Public Read Only OWD erscheinen im Dropdown
+- [ ] Bereits konfigurierte Objekte erscheinen nicht im Dropdown
+- [ ] Active-Umschalter funktioniert korrekt
+- [ ] Cleanup-Job kann geplant/ungeplant werden
+
+---
+
+## Use Case 7: Objektkonfiguration deaktivieren (Admin)
+
+### Ziel
+
+Team-Freigabe für ein Objekt deaktivieren und vorhandene Freigaben entfernen.
+
+### Voraussetzungen
+
+- Objekt bereits konfiguriert und aktiv
+- Teammitglieder existieren für dieses Objekt
+
+### Schritte
+
+| Schritt | Aktion | Erwartetes Ergebnis |
+|------|--------|----------------|
+| 1 | Configuration Wizard öffnen | Konfigurationsliste sichtbar |
+| 2 | "Active"-Schalter für Case ausschalten | Bestätigungsdialog |
+| 3 | Deaktivierung bestätigen | Status ändert sich zu inaktiv |
+| 4 | Vorhandene Case-Teams prüfen | Teammitglieder bleiben, aber Freigaben entfernt |
+
+### Validierungspunkte
+
+- [ ] Batch-Job läuft, um Freigabedatensätze zu löschen
+- [ ] Teammitgliederdatensätze bleiben erhalten
+- [ ] Kann später reaktiviert werden (Freigaben neu erstellt)
+- [ ] Warnung über Freigabeentfernung angezeigt
+
+---
+
+## Use Case 9: Manuelle Bereinigung ausführen (Admin)
+
+### Ziel
+
+Bereinigung abgelaufener Teammitglieder manuell auslösen.
+
+### Voraussetzungen
+
+- Admin-Zugriff
+- Abgelaufene Teammitglieder existieren (End_Date__c in Vergangenheit)
+
+### Schritte
+
+| Schritt | Aktion | Erwartetes Ergebnis |
+|------|--------|----------------|
+| 1 | Configuration Wizard öffnen | Abschnitt Scheduled Jobs sichtbar |
+| 2 | Anzahl "Expired Members" anzeigen | Zeigt Anzahl abgelaufener Datensätze |
+| 3 | Auf "Run Cleanup Now" klicken | Batch-Job startet |
+| 4 | Seite aktualisieren | Anzahl abgelaufener auf 0 reduziert |
+
+### Validierungspunkte
+
+- [ ] Anzahl abgelaufener korrekt
+- [ ] Batch-Job wird erfolgreich abgeschlossen
+- [ ] Abgelaufene Mitglieder gelöscht
+- [ ] Zugehörige Freigabedatensätze entfernt
+
+---
+
+## Use Case 11: Komponentenanzeige konfigurieren (Admin)
+
+### Ziel
+
+Das Erscheinungsbild der Object Team Member-Komponente anpassen: Card-Titel ändern und maximale Anzahl angezeigter Teammitglieder festlegen.
+
+### Voraussetzungen
+
+- System Administrator-Profil
+- Zugriff auf Lightning App Builder
+
+### Schritte
+
+| Schritt | Aktion | Erwartetes Ergebnis |
+|------|--------|----------------|
+| 1 | Datensatzseite im Lightning App Builder öffnen | Seiten-Editor lädt |
+| 2 | Auf "Team Members"-Komponente klicken | Komponenteneigenschaftspanel öffnet sich rechts |
+| 3 | "Card Title" auf benutzerdefinierten Wert ändern | Titelvorschau aktualisiert sich |
+| 4 | "Max Displayed Members" auf gewünschte Anzahl setzen | Anzeigelimit konfiguriert |
+| 5 | Seite speichern und aktivieren | Änderungen angewendet |
+| 6 | Datensatz mit Teammitgliedern öffnen | Komponente zeigt konfigurierten Titel und respektiert Anzeigelimit |
+
+![Lightning App Builder-Konfiguration](../../../../assets/pictures/app-builder-config.png)
+
+### Konfigurationsoptionen
+
+| Einstellung | Werte | Verhalten |
+|---------|--------|----------|
+| Max Displayed Members = 5 | Standard | Zeigt erste 5 Mitglieder, "Show X more" für den Rest |
+| Max Displayed Members = 0 | Alle anzeigen | Alle Teammitglieder sichtbar, kein Ein-/Ausklappen |
+| Max Displayed Members = 3 | Benutzerdefiniertes Limit | Zeigt erste 3 Mitglieder, "Show X more" für den Rest |
+
+### Validierungspunkte
+
+- [ ] Card-Titel-Änderungen auf Datensatzseite reflektiert
+- [ ] Anzeigelimit eingehalten (korrekte Anzahl angezeigter Mitglieder)
+- [ ] "Show X more"-Schaltfläche erscheint, wenn Mitglieder Limit überschreiten
+- [ ] Limit auf 0 setzen zeigt alle Mitglieder ohne Einklapp-Schaltfläche
+- [ ] Datensatzbesitzer erscheint immer zuerst, unabhängig vom Limit
+- [ ] "Show less"-Schaltfläche klappt Liste zurück auf konfiguriertes Limit
+- [ ] Änderungen bleiben nach Seitenneuladung bestehen

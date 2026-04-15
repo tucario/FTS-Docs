@@ -1,0 +1,151 @@
+---
+title: التثبيت
+description: كيفية تثبيت وإعداد Flexible Team Share على مؤسسة Salesforce الخاصة بك.
+---
+
+import { Aside, Steps } from '@astrojs/starlight/components';
+
+يوضح هذا الدليل كيفية تثبيت Flexible Team Share وإكمال الإعداد الأولي على مؤسسة Salesforce الخاصة بك.
+
+![Flexible Team Share مثبت](../../../../assets/pictures/install-guide-1.png)
+
+## المتطلبات الأساسية
+
+### الإعدادات الافتراضية على مستوى المؤسسة
+
+قبل تكوين Flexible Team Share، تأكد من تكوين إعدادات المشاركة OWD بشكل صحيح للكائنات التي تريد تمكين وظيفة الفريق عليها.
+
+**إعدادات المشاركة المطلوبة** — لكي يعمل Flexible Team Share بشكل صحيح، يجب تعيين OWD للكائن على أحد الخيارين التاليين:
+
+- **Private** — يمكن للمستخدمين رؤية سجلاتهم الخاصة فقط (موصى به)
+- **Public Read Only** — يمكن للمستخدمين رؤية جميع السجلات ولكن لا يمكنهم تحريرها
+
+<Aside type="caution">
+إذا تم تعيين OWD على **Public Read/Write**، فلن تتمكن سجلات المشاركة من منح وصول إضافي لأن المستخدمين لديهم بالفعل وصول كامل لجميع السجلات.
+</Aside>
+
+### كيفية التحقق/تحديث إعدادات المشاركة
+
+<Steps>
+1. انتقل إلى **Setup** > **Sharing Settings**
+2. ابحث عن الكائن الذي تريد تكوينه
+3. تحقق من أن الوصول الافتراضي معين على **Private** أو **Public Read Only**
+4. إذا لزم الأمر، انقر على **Edit** لتعديل الإعدادات
+</Steps>
+
+![Sharing Settings في Setup](../../../../assets/pictures/install-guide-3.png)
+
+## التثبيت من AppExchange
+
+![شاشة تثبيت AppExchange](../../../../assets/pictures/install-guide-2.png)
+
+<Steps>
+1. **حدد "Install for Admins Only"** — نوصي بشدة بهذا الخيار. التثبيت لـ "All Users" سيمنح الجميع وصولًا فوريًا إلى تطبيق المسؤول ومعالج التكوين. من خلال حصر التثبيت على المسؤولين، يمكنك الحفاظ على التحكم الكامل ومنح الوصول لاحقًا لمستخدمين محددين عبر Permission Sets.
+2. **اعترف بالتحذير** — حدد المربع لتأكيد أنك تقوم بتثبيت تطبيق من خارج Salesforce.
+3. **تأكيد التثبيت** — انقر على زر **Install** للمتابعة.
+</Steps>
+
+## الخطوة 1: تعيين الأذونات
+
+يتضمن Flexible Team Share مجموعتي Permission Set Group بمستويات وصول مختلفة:
+
+| Permission Set Group | الوصف |
+|---------------------|-------------|
+| **Flexible Team Share - Admin** | وصول كامل لبيانات أعضاء الفريق + وصول لتطبيق تكوين المسؤول |
+| **Flexible Team Share - User** | وصول لبيانات أعضاء الفريق فقط (يمكن عرض وإدارة أعضاء الفريق على السجلات) |
+
+### تعيين Permission Set Groups
+
+<Steps>
+1. انتقل إلى **Setup** > **Permission Set Groups**
+2. انقر على **Flexible Team Share - Admin** أو **Flexible Team Share - User**
+
+   ![قائمة Permission Set Groups](../../../../assets/pictures/install-guide-4.png)
+
+3. انقر على **Manage Assignments** > **Add Assignments**
+4. حدد المستخدمين وانقر على **Next** > **Assign**
+
+   ![تعيين المستخدمين لـ Permission Set Group](../../../../assets/pictures/install-guide-5.png)
+</Steps>
+
+<Aside type="tip">
+قم بتعيين **Admin** Permission Set Group لمسؤولي النظام الذين سيقومون بتكوين التطبيق. قم بتعيين **User** Permission Set Group للمستخدمين النهائيين الذين سيستخدمون وظيفة الفريق على السجلات.
+</Aside>
+
+![Permission Set Group Assignments](../../../../assets/pictures/permission-set-groups.png)
+
+## الخطوة 2: تكوين الكائنات
+
+استخدم معالج التكوين لتمكين وظيفة الفريق لكائنات محددة.
+
+### فتح معالج التكوين
+
+<Steps>
+1. افتح **App Launcher** (قائمة 9 نقاط)
+2. ابحث عن **Flexible Team Share** وحددها
+3. انتقل إلى علامة التبويب **Configuration**
+</Steps>
+
+![معالج التكوين](../../../../assets/pictures/install-guide-6.png)
+
+### إضافة تكوين كائن
+
+<Steps>
+1. في معالج التكوين، انقر على **Add New Configuration**
+2. حدد الكائن الذي تريد تمكينه (مثل `Custom_Object__c` أو كائن قياسي)
+3. قدم تسمية للتكوين
+4. انقر على **Deploy**
+</Steps>
+
+![إضافة تكوين - تحديد الكائن](../../../../assets/pictures/install-guide-7.png)
+![إضافة تكوين - التسمية](../../../../assets/pictures/install-guide-8.png)
+![إضافة تكوين - النشر](../../../../assets/pictures/install-guide-9.png)
+![إضافة تكوين - النجاح](../../../../assets/pictures/install-guide-10.png)
+
+سيقوم المعالج بإنشاء سجل Custom Metadata اللازم لتمكين وظيفة الفريق للكائن المحدد.
+
+### تنشيط/إلغاء تنشيط التكوينات
+
+استخدم مفتاح التبديل بجوار كل تكوين لتنشيط أو إلغاء تنشيط وظيفة الفريق. سيؤدي إلغاء تنشيط تكوين إلى إخفاء مكون عضو الفريق على سجلات ذلك الكائن.
+
+![مفتاح تبديل Active/Inactive](../../../../assets/pictures/install-guide-11.png)
+
+## الخطوة 3: إضافة المكون إلى صفحات السجلات
+
+بعد تكوين كائن، أضف مكون عضو الفريق إلى تخطيط صفحة السجل.
+
+### استخدام Lightning App Builder
+
+<Steps>
+1. انتقل إلى سجل للكائن المكوّن
+2. انقر على **أيقونة الترس** > **Edit Page**
+
+   ![زر Edit Page](../../../../assets/pictures/install-guide-12.png)
+
+3. في Lightning App Builder، ابحث عن **objectTeamMember** في لوحة Components (تحت Custom)
+4. اسحب المكون إلى الموقع المطلوب على الصفحة
+
+   ![سحب المكون في App Builder](../../../../assets/pictures/install-guide-13.png)
+
+5. انقر على **Save**
+6. إذا تمت المطالبة، قم بـ **Activate** الصفحة للمستخدمين/الملفات الشخصية المناسبة
+</Steps>
+
+### توصيات وضع المكون
+
+| الموقع | الأفضل لـ |
+|----------|----------|
+| **Right Sidebar** | وصول سريع دون شغل مساحة المحتوى الرئيسي |
+| **Related Lists Section** | يحافظ على أعضاء الفريق مجمعين مع البيانات الأخرى ذات الصلة |
+| **New Tab** | الأفضل لسيناريوهات إدارة الفريق المعقدة |
+
+## قائمة التحقق من التثبيت
+
+بعد إكمال التثبيت، تحقق مما يلي:
+
+- [ ] تم تكوين إعدادات المشاركة OWD بشكل صحيح للكائنات المستهدفة
+- [ ] تم تعيين Admin Permission Set Group للمستخدمين المسؤولين
+- [ ] تم تعيين User Permission Set Group للمستخدمين النهائيين
+- [ ] تم تكوين كائن واحد على الأقل في معالج التكوين
+- [ ] تمت إضافة مكون عضو الفريق إلى صفحة السجل
+- [ ] مهمة التنظيف المجدولة قيد التشغيل (راجع [التكوين](/ar/getting-started/configuration/#scheduled-job))

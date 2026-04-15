@@ -1,0 +1,121 @@
+---
+title: セキュリティスキャンレポート
+description: 静的コード分析の結果とセキュリティベストプラクティス。
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+## 使用したスキャンツール
+
+| ツール | バージョン | 目的 |
+|------|---------|---------|
+| Salesforce Code Analyzer v5 | Latest | Apex/LWCセキュリティ分析 |
+| PMD（AppExchangeルールを含む） | v5 | コード品質とセキュリティ |
+| ESLint | v5 | JavaScript/LWC分析 |
+| RetireJS | v5 | 脆弱なJSライブラリ |
+| Partner Security Portal（Checkmarx） | Latest | 必須ソーススキャン |
+
+## スキャンレポートの生成方法
+
+### 前提条件
+
+```bash
+# Salesforce CLIをインストール
+npm install -g @salesforce/cli
+
+# Code Analyzer v5プラグインをインストール
+sf plugins install @salesforce/plugin-code-analyzer
+```
+
+### 完全スキャンを実行
+
+```bash
+# HTML出力ですべてのルールを実行
+sf code-analyzer run --workspace force-app --output-file docs/scan-results.html
+
+# AppExchange固有のルールを実行
+sf code-analyzer run --rule-selector AppExchange --workspace force-app --output-file docs/scan-appexchange.html
+
+# Securityタグ付きルールのみを実行
+sf code-analyzer run --rule-selector Security --workspace force-app --output-file docs/scan-security.html
+
+# HighまたはCriticalで失敗（CI/CD）
+sf code-analyzer run --rule-selector AppExchange --workspace force-app --severity-threshold 2 --output-file docs/scan-appexchange.html
+```
+
+## 実装されたセキュリティベストプラクティス
+
+### CRUD/FLS実施
+
+- INSERT前の`isCreateable()`チェック
+- UPDATE前の`isUpdateable()`チェック
+- DELETE前の`isDeletable()`チェック
+- Permission Setを介したフィールドレベル権限
+
+### SOQLインジェクション防止
+
+- ユーザー入力にバインド変数を使用
+- 動的クエリには`String.escapeSingleQuotes()`
+- オブジェクト名はSalesforce IDから導出（ユーザー入力ではない）
+
+### 共有モデルコンプライアンス
+
+- メインコントローラーで`with sharing`
+- 文書化され必要な場所でのみ`without sharing`
+- 共有レコードはOWD設定を尊重
+
+### LWCセキュリティ
+
+- `eval()`や動的スクリプト実行なし
+- 表示前にユーザー入力をサニタイズ
+- ハードコードされた認証情報なし
+
+## 外部統合セキュリティ
+
+| チェック | ステータス | 注記 |
+|-------|--------|-------|
+| HTTPコールアウト | 該当なし | パッケージは外部呼び出しを行いません |
+| Named Credentials | 該当なし | 使用していません |
+| External Objects | 該当なし | 使用していません |
+| Remote Site Settings | 該当なし | 不要 |
+| CSP違反 | 合格 | Content-Security-Policy違反なし |
+
+## Apexテストカバレッジ
+
+| クラス | カバレッジ | ステータス |
+|-------|----------|--------|
+| ObjectTeamMemberController | >75% | 合格 |
+| TeamMemberWizardController | >75% | 合格 |
+| ShareRecordQueueable | >75% | 合格 |
+| SharingRecalculationBatch | >75% | 合格 |
+| ExpiredTeamMemberCleanupBatch | >75% | 合格 |
+| ObjectTeamMemberTriggerHandler | >75% | 合格 |
+| PostInstallHandler | >75% | 合格 |
+| **全体** | **>75%** | **合格** |
+
+### カバレッジ付きでテストを実行する方法
+
+```bash
+# カバレッジ付きですべてのテストを実行
+sf apex run test --code-coverage --result-format human --target-org [ORG_ALIAS]
+
+# 特定のテストクラスを実行
+sf apex run test --tests ObjectTeamMemberTest --code-coverage --result-format human --target-org [ORG_ALIAS]
+```
+
+## スキャナーコマンドリファレンス（Code Analyzer v5）
+
+```bash
+# 利用可能なルールを一覧表示
+sf code-analyzer rules
+
+# AppExchangeルールのみを一覧表示
+sf code-analyzer rules --rule-selector AppExchange
+
+# 特定のルールセレクターで実行
+sf code-analyzer run --rule-selector Security --workspace force-app
+
+# さまざまな形式にエクスポート
+sf code-analyzer run --workspace force-app --output-file results.html
+sf code-analyzer run --workspace force-app --output-file results.sarif
+```

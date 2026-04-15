@@ -1,0 +1,31 @@
+---
+title: Admin Tasks
+description: Security and administration use cases for Flexible Team Share.
+slug: 1.0/use-cases/admin-tasks
+---
+
+## Use Case 8: Access Without Permission Set
+
+### Objective
+
+Verify behavior when user lacks required permissions.
+
+### Prerequisites
+
+* User WITHOUT FTS\_Data\_Access permission set
+* Record page with Object Team component
+
+### Steps
+
+| Step | Action | Expected Result |
+|------|--------|----------------|
+| 1 | Open record page | Page loads |
+| 2 | View Object Team component | Error message displayed |
+
+![Access Required error](../../../../assets/pictures/1.0/access-required.png)
+
+### Validation Points
+
+* \[ ] Clear error message about missing access
+* \[ ] No data exposed
+* \[ ] No system errors/exceptions

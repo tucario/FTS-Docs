@@ -1,0 +1,263 @@
+---
+title: Konfiguration
+description: Konfigurieren Sie Flexible Team Share-Komponenten, Owner-Synchronisierung und geplante Jobs.
+---
+
+import { Aside, Steps } from '@astrojs/starlight/components';
+
+## Komponentenkonfiguration
+
+Die Object Team Member-Komponente kann direkt im Lightning App Builder mit den folgenden Eigenschaften konfiguriert werden:
+
+| Eigenschaft | Typ | Standard | Beschreibung |
+|----------|------|---------|-------------|
+| **Card Title** | String | Team Members | Der auf der Komponentenkarte angezeigte Titel |
+| **Max Displayed Members** | Integer | 5 | Maximale Anzahl der angezeigten Teammitglieder vor dem Einklappen. Auf 0 setzen, um alle anzuzeigen |
+
+Wenn die Anzahl der Teammitglieder das konfigurierte Limit überschreitet, wird die Liste eingeklappt und zeigt eine Schaltfläche **"Show all (X more)"** an. Durch Anklicken wird die vollständige Liste erweitert, mit einer Schaltfläche **"Show less"**, um sie wieder einzuklappen. Der Datensatzbesitzer erscheint immer zuerst in der Liste, unabhängig vom Anzeigelimit.
+
+![Eingeklappte Teammitgliederliste](../../../../assets/pictures/team-members-collapsed.png)
+
+![Lightning App Builder — Komponenteneigenschaften](../../../../assets/pictures/app-builder-config.png)
+
+### Anzeigelimit-Verhalten
+
+| Einstellung | Verhalten |
+|---------|----------|
+| Max Displayed Members = **5** (Standard) | Zeigt erste 5 Mitglieder, "Show X more" für den Rest |
+| Max Displayed Members = **0** | Alle Teammitglieder sichtbar, kein Ein-/Ausklappen |
+| Max Displayed Members = **3** (benutzerdefiniert) | Zeigt erste 3 Mitglieder, "Show X more" für den Rest |
+
+## Teammitgliederrollen
+
+Beim Hinzufügen von Benutzern zu einem Team weisen Sie ihnen eine der folgenden Rollen zu:
+
+| Rolle | Beschreibung | Fähigkeiten |
+|------|-------------|-------------|
+| **Owner** | Der Datensatzbesitzer | Wird automatisch zugewiesen, wenn ein Datensatz erstellt wird. Kann nicht manuell zugewiesen oder entfernt werden. Hat vollen Zugriff auf die Verwaltung von Teammitgliedern. Wird automatisch gelöscht, wenn keine anderen Benutzer im Team sind. |
+| **Manager** | Team-Administrator | Kann Teammitglieder hinzufügen, bearbeiten und entfernen. Verwenden Sie diese Rolle für Benutzer, die die Teamzusammensetzung verwalten müssen. |
+| **User** | Standard-Teammitglied | Kann die Liste der Teammitglieder anzeigen, aber nicht ändern. Verwenden Sie diese Rolle für Benutzer, die nur Zugriff auf den Datensatz benötigen. |
+
+![Team Members-Komponente mit Rollen](../../../../assets/pictures/team-members-expanded.png)
+
+<Aside type="note">
+- Die **Owner**-Rolle wird automatisch vom System erstellt und repräsentiert den aktuellen Datensatzbesitzer
+- Sowohl **Manager**- als auch **User**-Rollen erhalten Datensatzzugriff basierend auf ihrer zugewiesenen Zugriffsebene (Read Only oder Read/Write)
+- Nur Benutzer mit **Owner**- oder **Manager**-Rollen können Teammitglieder hinzufügen, bearbeiten oder entfernen
+</Aside>
+
+## Owner-Änderungs-Synchronisierung
+
+Wenn sich der Datensatzbesitzer ändert (z. B. ein Account einem anderen Vertriebsmitarbeiter zugewiesen wird), wird das Owner-Teammitglied **NICHT automatisch aktualisiert**. Das System erstellt den Owner-Datensatz, wenn das erste Teammitglied hinzugefügt wird, verfolgt jedoch keine nachfolgenden Besitzerwechsel beim übergeordneten Datensatz.
+
+Um den Team-Owner mit dem Datensatzbesitzer synchron zu halten, müssen Sie einen **Record-Triggered Flow** erstellen.
+
+<Aside type="note" title="Warum ist dies nicht automatisch?">
+Salesforce Managed Packages können keine Trigger für Standardobjekte wie Account oder Opportunity enthalten. Flexible Team Share stellt eine **Invocable Action** bereit, die Sie aus einem Flow aufrufen können, um den Owner bei Bedarf zu synchronisieren.
+</Aside>
+
+### Einrichtung über Flow (empfohlen)
+
+<Steps>
+1. Gehen Sie zu **Setup** > **Flows**
+2. Klicken Sie auf **New Flow** > **Record-Triggered Flow**
+3. Wählen Sie das Objekt aus (z. B. Account)
+4. Konfigurieren Sie den Trigger: **"A record is updated"**
+5. Fügen Sie Entry Condition hinzu: Formula > `ISCHANGED({!$Record.OwnerId})` evaluiert zu `true`
+6. Setzen Sie **"When to Run the Flow"** auf **"After the record is saved"**
+7. Fügen Sie ein **Action**-Element hinzu
+8. Suchen Sie nach **"Sync Team Member Owner"**
+9. Setzen Sie den **"Record ID"**-Parameter auf `{!$Record.Id}`
+10. Lassen Sie **"Object API Name"** leer (wird automatisch aus Record ID abgeleitet)
+11. Speichern und **aktivieren** Sie den Flow
+</Steps>
+
+![Flow Builder - Owner Sync Flow](../../../../assets/pictures/flow-builder-owner-sync.png)
+![Sync Team Member Owner Action-Konfiguration](../../../../assets/pictures/sync-owner-action-config.png)
+
+<Aside type="tip">
+Wiederholen Sie diese Schritte für jedes Objekt, bei dem Sie eine automatische Owner-Synchronisierung wünschen (z. B. Account, Opportunity, Case, Lead).
+</Aside>
+
+### Einrichtung über Apex Trigger
+
+```apex
+trigger AccountOwnerSync on Account(after update) {
+  List<tucariofts.SyncOwnerInvocable.SyncOwnerRequest> requests =
+    new List<tucariofts.SyncOwnerInvocable.SyncOwnerRequest>();
+
+  for (Account acc : Trigger.new) {
+    Account oldAcc = Trigger.oldMap.get(acc.Id);
+    if (acc.OwnerId != oldAcc.OwnerId) {
+      tucariofts.SyncOwnerInvocable.SyncOwnerRequest req =
+        new tucariofts.SyncOwnerInvocable.SyncOwnerRequest();
+      req.recordId = acc.Id;
+      requests.add(req);
+    }
+  }
+
+  if (!requests.isEmpty()) {
+    tucariofts.SyncOwnerInvocable.syncOwners(requests);
+  }
+}
+```
+
+### Aufruf aus Apex-Code (einzelner Datensatz)
+
+```apex
+tucariofts.SyncOwnerInvocable.SyncOwnerRequest request =
+    new tucariofts.SyncOwnerInvocable.SyncOwnerRequest();
+request.recordId = accountId;
+
+List<tucariofts.SyncOwnerInvocable.SyncOwnerResult> results =
+    tucariofts.SyncOwnerInvocable.syncOwners(
+        new List<tucariofts.SyncOwnerInvocable.SyncOwnerRequest>{ request }
+    );
+
+if (results[0].success) {
+    System.debug('Owner synced: ' + results[0].oldOwnerId +
+                 ' → ' + results[0].newOwnerId);
+} else {
+    System.debug('Sync failed: ' + results[0].message);
+}
+```
+
+### Ergebnisobjekt
+
+| Feld | Typ | Beschreibung |
+|-------|------|-------------|
+| `success` | Boolean | Ob die Synchronisierung erfolgreich war |
+| `message` | String | Ergebnisnachricht oder Fehlerdetails |
+| `oldOwnerId` | Id | Vorherige Owner-User-ID |
+| `newOwnerId` | Id | Neue Owner-User-ID |
+
+### Fehlerszenarien
+
+| Szenario | Ergebnis |
+|----------|--------|
+| Keine Teammitglieder beim Datensatz | `success = false`, "No Owner team member found" |
+| Owner unverändert | `success = true`, "Owner unchanged, no update needed" |
+| Record ID null | `success = false`, "Record ID is required" |
+| Ungültige Record ID | `success = false`, Fehlermeldung |
+
+### Wichtige Einschränkungen
+
+**Queue-Owner werden nicht unterstützt** — Flexible Team Share unterstützt keine Queues als Team-Owner. Wenn ein Datensatz einer Queue gehört:
+
+- Das System verwendet den **aktuellen Benutzer** (die Person, die zuerst ein Teammitglied hinzufügt) als Owner im Team
+- Wenn Sie später den Datensatzbesitzer von einer Queue zu einem User ändern, führen Sie die Sync Owner-Aktion aus, um das Team zu aktualisieren
+- Wenn Sie den Owner von einem User zu einer Queue ändern, bleibt der Team-Owner als vorheriger Benutzer bestehen
+
+**Flow muss pro Objekt erstellt werden** — Sie müssen einen separaten Flow für jeden Objekttyp erstellen, bei dem Sie eine Owner-Synchronisierung wünschen. Die Invocable Action funktioniert mit jedem Objekt, aber Salesforce erfordert separate Record-Triggered Flows pro Objekt.
+
+## Temporärer Zugriff mit Enddatum
+
+Beim Hinzufügen eines Teammitglieds können Sie optional ein **Enddatum** festlegen, um temporären Zugriff auf einen Datensatz zu gewähren. Dies ist nützlich für:
+
+- Projektbasierte Zusammenarbeit mit definierten Zeitrahmen
+- Temporäre Berater oder Auftragnehmer
+- Urlaubsvertretung oder delegierte Verantwortlichkeiten
+- Prüfungs- oder Überprüfungszeiträume
+
+### Wie es funktioniert
+
+<Steps>
+1. Setzen Sie beim Hinzufügen oder Bearbeiten eines Teammitglieds das Feld **End Date** auf den letzten Tag, an dem es Zugriff haben soll
+2. Das Teammitglied behält vollen Zugriff bis zum Ende dieses Tages
+3. Nach Ablauf des Enddatums entfernt der geplante Bereinigungsjob das Teammitglied automatisch und widerruft den Zugriff
+</Steps>
+
+![Teammitglied mit Enddatum](../../../../assets/pictures/team-members-end-date.png)
+
+### Automatischer Bereinigungsprozess
+
+- Ein geplanter Batch-Job läuft täglich (standardmäßig um 2:00 Uhr), um abgelaufene Teammitglieder zu entfernen
+- Wenn ein Teammitglied entfernt wird, wird auch sein Freigabedatensatz gelöscht, wodurch der Zugriff auf den Datensatz widerrufen wird
+- Der Bereinigungsjob kann über den Configuration Wizard verwaltet werden
+
+![Scheduled Job-Verwaltung](../../../../assets/pictures/install-guide-14.png)
+
+## Scheduled Job
+
+Flexible Team Share enthält einen automatischen Bereinigungsjob, der abgelaufene Teammitglieder entfernt. Dieser Job wird während der Paketinstallation automatisch geplant.
+
+### Job überprüfen
+
+<Steps>
+1. Gehen Sie zu **Setup** > **Scheduled Jobs**
+2. Suchen Sie nach **Flexible Team Share - Expired Member Cleanup**
+3. Überprüfen Sie, ob der Job täglich geplant ist
+</Steps>
+
+![Scheduled Jobs in Setup](../../../../assets/pictures/install-guide-20.png)
+
+### Manuelle Job-Verwaltung
+
+Administratoren können den Bereinigungsjob über den Configuration Wizard verwalten:
+
+- **Schedule Job** — Manuell planen, falls nicht aktiv
+- **Unschedule Job** — Automatische Bereinigung stoppen
+- **Run Now** — Bereinigung sofort ausführen
+
+## Fehlerbehebung
+
+### Warnung "Configuration Not Found"
+
+**Symptom:** Ein Warnmodal erscheint mit der Aussage, dass keine Konfiguration für dieses Objekt existiert.
+
+**Ursache:** Die Team Member-Komponente wurde zu einer Datensatzseite hinzugefügt, bevor das Objekt im Configuration Wizard konfiguriert wurde.
+
+**Lösung:**
+<Steps>
+1. Gehen Sie zum Configuration Wizard (Flexible Team Share-App > Configuration)
+2. Fügen Sie eine Konfiguration für dieses Objekt hinzu und deployen Sie sie
+3. Kehren Sie zur Datensatzseite zurück — die Komponente sollte jetzt korrekt funktionieren
+</Steps>
+
+![Configuration Not Found-Warnung](../../../../assets/pictures/install-guide-15.png)
+
+### Fehler "No Access"
+
+**Symptom:** Die Komponente zeigt eine "No Access"-Nachricht mit einem Schlosssymbol anstelle von Teammitgliedern an.
+
+**Ursache:** Der aktuelle Benutzer hat nicht die erforderliche Permission Set Group zugewiesen.
+
+**Lösung:**
+<Steps>
+1. Gehen Sie zu **Setup** > **Permission Set Groups**
+2. Weisen Sie entweder die **Admin**- oder **User** Permission Set Group den betroffenen Benutzern zu
+3. Benutzer müssen sich möglicherweise ab- und wieder anmelden, damit die Änderungen wirksam werden
+</Steps>
+
+![No Access-Fehler](../../../../assets/pictures/install-guide-16.png)
+
+### Warnung "Limit Reached"
+
+**Symptom:** Die Schaltfläche "Add Team Member" ist deaktiviert und eine Nachricht zeigt an, dass das Limit erreicht wurde.
+
+**Ursache:** Sie haben die maximale Anzahl erlaubter Teammitglieder erreicht.
+
+**Lösung:** Entfernen Sie inaktive oder unnötige Teammitglieder, um Plätze freizugeben.
+
+| Teammitglieder innerhalb des Limits | Teammitglieder über dem Limit |
+|:-----|:-----|
+| ![Innerhalb des Limits](../../../../assets/pictures/install-guide-17.png) | ![Über dem Limit](../../../../assets/pictures/install-guide-18.png) |
+
+![Limit reached-Warnungsdetail](../../../../assets/pictures/install-guide-19.png)
+
+### Freigabe funktioniert nicht
+
+**Symptom:** Teammitglieder werden erfolgreich hinzugefügt, aber sie können nicht auf den Datensatz zugreifen.
+
+**Ursache:** Die Organization-Wide Default (OWD)-Freigabeeinstellung des Objekts ist auf Public Read/Write gesetzt.
+
+**Lösung:**
+<Steps>
+1. Gehen Sie zu **Setup** > **Sharing Settings**
+2. Ändern Sie das OWD des Objekts auf **Private** oder **Public Read Only**
+3. Hinweis: Das Ändern von OWD-Einstellungen kann den Zugriff anderer Benutzer beeinflussen — konsultieren Sie Ihren Salesforce-Administrator
+</Steps>
+
+## Support
+
+Bei Fragen oder Problemen wenden Sie sich bitte an [support@tucario.com](mailto:support@tucario.com).

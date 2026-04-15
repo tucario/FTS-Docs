@@ -1,0 +1,18 @@
+/* Flexible Team Share brand colors */
+:root {
+  --sl-color-accent-low: #072044;
+  --sl-color-accent: #0c66e4;
+  --sl-color-accent-high: #b3d4fc;
+  --sl-hue-accent: 215;
+}
+
+:root[data-theme="light"] {
+  --sl-color-accent-low: #b3d4fc;
+  --sl-color-accent: #09326c;
+  --sl-color-accent-high: #072044;
+}
+
+/* RTL (Arabic) support */
+[dir="rtl"] .sl-markdown-content table {
+  text-align: right;
+}

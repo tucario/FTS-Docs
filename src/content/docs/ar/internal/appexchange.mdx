@@ -1,0 +1,213 @@
+---
+title: إصدار AppExchange
+description: دليل خطوة بخطوة لبناء ومسح وتقديم الحزمة إلى AppExchange.
+---
+
+import { Aside, Steps } from '@astrojs/starlight/components';
+
+## المرحلة 1: ما قبل الطيران (محلي)
+
+قم بتشغيل هذه قبل لمس المؤسسة. أصلح كل ما يظهر.
+
+### 1.1 Salesforce Code Analyzer v5 — مسح كامل
+
+```bash
+# التثبيت (مرة واحدة)
+sf plugins install @salesforce/plugin-code-analyzer
+
+# تشغيل جميع القواعد (PMD، ESLint، RetireJS، Regex، Flow، CPD)
+sf code-analyzer run \
+  --workspace force-app \
+  --output-file docs/scan-results.html
+
+# تشغيل قواعد AppExchange المحددة
+sf code-analyzer run \
+  --rule-selector AppExchange \
+  --workspace force-app \
+  --output-file docs/scan-appexchange.html
+
+# تشغيل القواعد الموسومة بـ Security فقط
+sf code-analyzer run \
+  --rule-selector Security \
+  --workspace force-app \
+  --output-file docs/scan-security.html
+
+# حد الشدة — فشل على High أو Critical (CI/CD)
+sf code-analyzer run \
+  --rule-selector AppExchange \
+  --workspace force-app \
+  --severity-threshold 2 \
+  --output-file docs/scan-appexchange.html
+```
+
+**عدم التسامح على**: Critical (1) و High (2).
+Medium (3) وأقل — وثّق كإيجابيات كاذبة في `docs/FALSE-POSITIVES.md`.
+
+### 1.2 ESLint (LWC)
+
+```bash
+npm run lint
+```
+
+### 1.3 اختبارات LWC Jest
+
+```bash
+npm run test:unit
+```
+
+## المرحلة 2: اختبارات المؤسسة والتغطية
+
+### 2.1 تشغيل جميع اختبارات Apex
+
+```bash
+sf apex run test \
+  --code-coverage \
+  --result-format human \
+  --wait 10 \
+  --target-org FlexiFREE
+```
+
+**مطلوب**: >= 75% تغطية إجمالية، يجب أن يكون لكل trigger تغطية.
+
+### 2.2 التحقق من تغطية كل فئة
+
+```bash
+sf apex run test \
+  --code-coverage \
+  --result-format json \
+  --wait 10 \
+  --target-org FlexiFREE \
+  | jq '.result.coverage.coverage[]
+        | select(.coveredPercent < 75)
+        | {name, coveredPercent}'
+```
+
+## المرحلة 3: بناء إصدار الحزمة (beta)
+
+### 3.1 زيادة الإصدار في sfdx-project.json
+
+```json
+"versionName": "ver 1.2.0",
+"versionNumber": "1.2.0.NEXT"
+```
+
+### 3.2 إنشاء إصدار حزمة beta
+
+```bash
+sf package version create \
+  --package FlexibleTeamShare \
+  --definition-file config/package-scratch-def.json \
+  --installation-key-bypass \
+  --wait 30 \
+  --code-coverage \
+  --skip-ancestor-check
+```
+
+### 3.3 التحقق من التغطية
+
+```bash
+sf package version list --packages FlexibleTeamShare --order-by CreatedDate --verbose
+sf package version report --package 04tXXXXXXXXXXXXXXX --verbose
+```
+
+## المرحلة 4: اختبار التثبيت
+
+### 4.1 التثبيت في مؤسسة scratch/sandbox نظيفة
+
+```bash
+sf package install \
+  --package 04tXXXXXXXXXXXXXXX \
+  --target-org TestOrg \
+  --wait 10
+```
+
+### 4.2 اختبار سريع
+
+- تعيين Permission Sets `FTS_App_Access` و `FTS_Data_Access`
+- تكوين تكوين مشاركة عبر المعالج
+- إضافة/تحرير/إزالة أعضاء الفريق على سجل
+- التحقق من إنشاء/حذف سجلات المشاركة
+- الاختبار كمستخدم غير مسؤول (FTS_Data_Access فقط)
+
+## المرحلة 5: الترويج للإصدار
+
+<Aside type="caution">
+هذا **لا يمكن الرجوع عنه** — لا يمكن حذف الإصدارات المروّجة.
+</Aside>
+
+```bash
+sf package version promote --package 04tXXXXXXXXXXXXXXX
+```
+
+## المرحلة 6: Partner Security Portal — Source Scanner (Checkmarx)
+
+هذا **إلزامي** لأي تقديم يتضمن حزمة Salesforce.
+
+<Steps>
+1. انتقل إلى [Partner Security Portal](https://security.my.salesforce-sites.com/sourcescanner) باستخدام بيانات اعتماد DevHub/packaging org
+2. حدد إصدار الحزمة **المروّج** (released) الخاص بك
+3. انقر على **Start Scan** وانتظر النتائج (عادةً 15-30 دقيقة)
+4. قم بتنزيل التقرير
+</Steps>
+
+<Aside type="tip">
+تحصل على **3 عمليات مسح مجانية لكل مراجعة**. لا تضيعها على إصدارات beta.
+</Aside>
+
+### التعامل مع النتائج
+
+- **Critical/High** — أصلح الكود، أعد البناء، أعد المسح
+- **إيجابيات كاذبة** — وثّق في `docs/FALSE-POSITIVES.md`، أرفق بالتقديم
+- **Low/Info** — وثّق المبرر، لا حاجة للإصلاح
+
+## المرحلة 7: مسح DAST (إن وجد)
+
+ليس لدى Flexible Team Share **استدعاءات خارجية، لا واجهة مستخدم ويب، لا نقاط نهاية API** — DAST **غير قابل للتطبيق**.
+
+## المرحلة 8: تحضير مواد التقديم
+
+### المستندات المطلوبة
+
+| المادة | الملف | ملاحظات |
+|----------|------|-------|
+| تقرير Code Analyzer (كامل) | `docs/scan-results.html` | من المرحلة 1 |
+| تقرير Code Analyzer (AppExchange) | `docs/scan-appexchange.html` | من المرحلة 1 |
+| تقرير Source Scanner | تم التنزيل من البوابة | من المرحلة 6 |
+| وثيقة الإيجابيات الكاذبة | `docs/FALSE-POSITIVES.md` | اشرح كل نتيجة |
+| وثائق المسؤول/المستخدم | `docs/APPLICATION-OVERVIEW.md`، `docs/USE-CASES.md` | المراجعون يختبرون تطبيقك |
+| دليل التثبيت | `docs/1. Installation Guide.md` | خطوة بخطوة للإعداد |
+
+### إعداد مؤسسة المراجعة
+
+- ثبّت إصدار الحزمة **المروّج**
+- **عطّل MFA/2FA** حتى يتمكن فريق المراجعة من تسجيل الدخول
+- ثبّت فقط الحزم المتعلقة بهذه المراجعة
+- أنشئ مستخدم اختبار مع وصول كامل لفريق المراجعة
+- كوّن مسبقًا تكوين مشاركة واحد على الأقل يعمل مع بيانات نموذجية
+
+## المرحلة 9: التقديم
+
+<Steps>
+1. انتقل إلى **AppExchange Partner Console** > Publishing > Security Review
+2. حدد حزمتك والإصدار المروّج
+3. ارفع جميع تقارير المسح
+4. قدّم بيانات اعتماد تسجيل الدخول للمؤسسة لفريق المراجعة
+5. ادفع رسوم $999 (للتطبيقات المدفوعة؛ التطبيقات المجانية — بدون رسوم)
+6. قدّم
+</Steps>
+
+**الجدول الزمني**: 4-6 أسابيع. معظم التطبيقات تنجح في المحاولة الثانية.
+
+## ملخص ترتيب التنفيذ
+
+```
+المرحلة 1  Code Analyzer + ESLint + Jest     ← إصلاح مشاكل الكود
+المرحلة 2  اختبارات Apex في المؤسسة (>= 75%)        ← إصلاح فجوات التغطية
+المرحلة 3  بناء إصدار حزمة beta        ← إذا فشل البناء، ارجع للمرحلة 2
+المرحلة 4  التثبيت والاختبار السريع في مؤسسة نظيفة ← إذا كان معطلاً، أصلح وأعد البناء
+المرحلة 5  الترويج للإصدار                ← لا يمكن الرجوع عنه
+المرحلة 6  Source Scanner (Checkmarx)        ← فقط على الإصدار المروّج
+المرحلة 7  مسح DAST (إن وجد)         ← غير قابل للتطبيق لهذا التطبيق
+المرحلة 8  تحضير الوثائق ومؤسسة المراجعة         ← تغليف كل شيء
+المرحلة 9  التقديم إلى AppExchange             ← انتظر 4-6 أسابيع
+```

@@ -1,0 +1,127 @@
+---
+title: Model danych
+description: Model danych i relacje między encjami w Flexible Team Share.
+---
+
+## Główny model danych
+
+```mermaid
+flowchart TB
+    PARENT["<b>Rekord nadrzędny</b><br/>(Account, Case, itd.)<br/>───────────<br/>• Id<br/>• OwnerId<br/>• Name"]
+
+    PARENT -->|"Record_Id__c<br/>(Text - klucz złożony)"| OTM
+
+    OTM["<b>ObjectTeamMember__c</b><br/>───────────<br/>• Record_Id__c<br/>• User_Id__c<br/>• Access_Level__c<br/>• Role__c<br/>• End_Date__c"]
+
+    OTM -->|"User_Id__c"| USER
+
+    USER["<b>User</b><br/>(Obiekt standardowy)<br/>───────────<br/>• Id<br/>• Name<br/>• Email"]
+
+    OTM -->|"Wyzwala utworzenie<br/>rekordu udostępnienia"| SHARE
+
+    SHARE["<b>[Object]Share</b><br/>(AccountShare, CaseShare, itd.)<br/>───────────<br/>• ParentId<br/>• UserOrGroupId<br/>• AccessLevel<br/>• RowCause = 'Manual'"]
+```
+
+## Diagram relacji encji
+
+```mermaid
+erDiagram
+    PARENT_RECORD ||--o{ ObjectTeamMember__c : "Record_Id__c"
+    User ||--o{ ObjectTeamMember__c : "User_Id__c"
+    ObjectTeamMember__c ||--o| OBJECT_SHARE : "wyzwala utworzenie"
+
+    PARENT_RECORD {
+        Id Id PK
+        Id OwnerId
+        String Name
+    }
+
+    ObjectTeamMember__c {
+        Id Id PK
+        Text Record_Id__c FK
+        Lookup User_Id__c FK
+        Picklist Access_Level__c
+        Picklist Role__c
+        Date End_Date__c
+    }
+
+    User {
+        Id Id PK
+        String Name
+        String Email
+    }
+
+    OBJECT_SHARE {
+        Id Id PK
+        Id ParentId FK
+        Id UserOrGroupId FK
+        String AccessLevel
+        String RowCause
+    }
+```
+
+## Obiekty niestandardowe
+
+### ObjectTeamMember__c
+
+Przechowuje przypisania członków zespołu łączące użytkownika z rekordem nadrzędnym.
+
+| Pole | Typ | Opis |
+|-------|------|-------------|
+| `Record_Id__c` | Text | Klucz złożony w formacie `ObjectName:RecordId` |
+| `User_Id__c` | Lookup(User) | Użytkownik będący członkiem zespołu |
+| `Access_Level__c` | Picklist | Read Only, Read/Write |
+| `Role__c` | Picklist | Owner, Manager, User |
+| `End_Date__c` | Date | Opcjonalna data wygaśnięcia dla dostępu tymczasowego |
+
+### Team_Sharing_Config__c
+
+Konfiguracja udostępniania per obiekt.
+
+| Pole | Typ | Opis |
+|-------|------|-------------|
+| `Object_Api_Name__c` | Text | Nazwa API skonfigurowanego obiektu |
+| `Object_Label__c` | Text | Etykieta wyświetlana dla obiektu |
+| `Is_Active__c` | Checkbox | Czy udostępnianie zespołowe jest aktywne dla tego obiektu |
+
+### FlexiTeamShare_Config__mdt
+
+Konfiguracja na poziomie aplikacji przechowywana jako Custom Metadata.
+
+| Pole | Typ | Opis |
+|-------|------|-------------|
+| `IsActive__c` | Checkbox | Główny przełącznik dla aplikacji |
+| `Cleanup_Batch_Size__c` | Number | Rozmiar partii dla zadań czyszczenia |
+| `Enable_Batch_Logging__c` | Checkbox | Włącz logowanie debugowania w zadaniach wsadowych |
+| `Enable_Expired_Member_Cleanup__c` | Checkbox | Włącz automatyczne czyszczenie wygasłych członków |
+
+## Obiekty konfiguracyjne
+
+```mermaid
+flowchart LR
+    MDT["<b>FlexiTeamShare_Config__mdt</b><br/>(Custom Metadata)<br/>───────────<br/>• IsActive__c<br/>• Cleanup_Batch_Size__c<br/>• Enable_Batch_Logging__c<br/>• Enable_Expired_Member_Cleanup__c"]
+
+    MDT -->|"Konfiguruje zachowanie"| TSC
+
+    TSC["<b>Team_Sharing_Config__c</b><br/>───────────<br/>• Object_Api_Name__c<br/>• Object_Label__c<br/>• Is_Active__c"]
+
+    TSC -->|"Włącza obiekt"| PARENT["<b>Obiekty nadrzędne</b><br/>(Account, Case, itd.)"]
+```
+
+## Pełny przegląd modelu
+
+```mermaid
+flowchart TB
+    PARENT["Rekord nadrzędny<br/>(Account, Case, itd.)"]
+    USER["User"]
+    OTM["ObjectTeamMember__c"]
+    SHARE["[Object]Share"]
+    TSC["Team_Sharing_Config__c"]
+    MDT["FlexiTeamShare_Config__mdt"]
+
+    PARENT --> OTM
+    USER --> OTM
+    OTM --> SHARE
+    MDT --> TSC
+    TSC --> PARENT
+```

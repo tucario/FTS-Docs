@@ -1,0 +1,231 @@
+---
+title: نظرة عامة على البنية
+description: البنية التقنية لحل Flexible Team Share.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+يوفر هذا المستند وصفًا تقنيًا مفصلاً لحل Flexible Team Share، بما في ذلك بنية النظام، تدفق البيانات، وطبقات المعالجة.
+
+## بنية النظام
+
+```mermaid
+flowchart TB
+    subgraph UI["UI LAYER"]
+        direction LR
+        LWC1["objectTeamMember<br/>Team member list & management"]
+        LWC2["objectTeamMemberWizard<br/>Admin configuration"]
+        LWC3["ftsLabels<br/>Custom labels utility"]
+    end
+
+    subgraph CTRL["CONTROLLER LAYER"]
+        direction LR
+        C1["ObjectTeamMemberController<br/>CRUD operations for team members"]
+        C2["TeamMemberWizardController<br/>Configuration wizard operations"]
+    end
+
+    subgraph DATA["DATA LAYER"]
+        direction LR
+        D1["ObjectTeamMember__c<br/>Team member assignments"]
+        D2["Team_Sharing_Config__c<br/>Per-object sharing config"]
+        D3["FlexiTeamShare_Config__mdt<br/>App configuration"]
+        D4["Triggers:<br/>ObjectTeamMemberTrigger"]
+    end
+
+    subgraph ASYNC["ASYNC PROCESSING LAYER"]
+        direction LR
+        A1["ShareRecordQueueable<br/>Create/update/delete shares"]
+        A2["SharingRecalculationBatch<br/>Bulk recalculation"]
+        A3["ExpiredTeamMemberCleanupBatch<br/>Daily cleanup of expired members"]
+    end
+
+    subgraph SHARE["SALESFORCE SHARING MODEL"]
+        direction LR
+        S1["Standard Share Objects<br/>AccountShare, ContactShare,<br/>CaseShare, LeadShare,<br/>OpportunityShare, etc."]
+        S2["Custom Object Shares<br/>[CustomObject]__Share"]
+        S3["ObjectTeamMember__Share<br/>Team member visibility"]
+    end
+
+    UI --> CTRL
+    CTRL --> DATA
+    DATA --> ASYNC
+    ASYNC --> SHARE
+```
+
+## الطبقات
+
+### طبقة واجهة المستخدم
+
+ثلاثة Lightning Web Components:
+
+| المكون | الغرض |
+|-----------|---------|
+| **objectTeamMember** | يعرض أعضاء الفريق على صفحات السجلات. يدعم الإضافة/التحرير/الحذف، قائمة قابلة للطي، وحد عرض قابل للتكوين. |
+| **objectTeamMemberWizard** | واجهة المسؤول لتكوين الكائنات، إدارة الإعدادات، وجدولة المهام. |
+| **ftsLabels** | مكون أداة يوفر Custom Labels لدعم i18n (35 لغة). |
+
+### طبقة التحكم
+
+| وحدة التحكم | الطرق |
+|-----------|---------|
+| **ObjectTeamMemberController** | `getTeamMembers()`، `addTeamMember()`، `updateTeamMember()`، `removeTeamMember()`، `isCurrentUserManager()`، `isSharingConfigured()`، `getAccessLevelOptions()` |
+| **TeamMemberWizardController** | `getExistingConfigs()`، `getAvailableObjects()`، `createConfig()`، `toggleConfigStatus()`، `deleteConfig()`، `getScheduledJobInfo()`، `scheduleCleanupJob()` |
+| **SyncOwnerInvocable** | `syncOwners()` — Invocable Action لمزامنة عضو فريق Owner عند تغيير المالك الأصلي. قابل للاستدعاء من Flow أو Apex، مجمّع بالكامل. |
+
+### طبقة البيانات
+
+كائنات مخصصة و trigger يعمل عند تغيير أعضاء الفريق:
+
+- **ObjectTeamMember__c** — يخزن تعيينات أعضاء الفريق
+- **Team_Sharing_Config__c** — تكوين المشاركة لكل كائن
+- **FlexiTeamShare_Config__mdt** — تكوين على مستوى التطبيق (Custom Metadata)
+- **ObjectTeamMemberTrigger** → **ObjectTeamMemberTriggerHandler** — يعالج Before Insert، Before Update، Before Delete
+
+### طبقة المعالجة غير المتزامنة
+
+| المكون | النوع | الغرض |
+|-----------|------|---------|
+| **ShareRecordQueueable** | Queueable | ينشئ ويحدث ويحذف سجلات المشاركة للكائنات الأصلية وأعضاء الفريق |
+| **SharingRecalculationBatch** | Batchable | إعادة حساب جميع المشاركات بشكل جماعي عند تغيير التكوين |
+| **ExpiredTeamMemberCleanupBatch** | Batchable | يحذف أعضاء الفريق منتهي الصلاحية (مهمة مجدولة يوميًا) |
+| **ExpiredTeamMemberCleanupScheduler** | Schedulable | يجدول batch التنظيف (يعمل في الساعة 2:00 صباحًا يوميًا) |
+
+## تدفق البيانات: إضافة عضو فريق
+
+```mermaid
+sequenceDiagram
+    actor User
+    participant LWC as objectTeamMember LWC
+    participant Ctrl as ObjectTeamMemberController
+    participant DB as Database
+    participant Queue as ShareRecordQueueable
+
+    User->>LWC: Click "Add Team Member"
+    LWC->>LWC: Collect input (User, Access Level, Role, End Date)
+    LWC->>Ctrl: addTeamMember(recordId, userId, accessLevel, role, endDate)
+
+    Ctrl->>Ctrl: Check for duplicates
+    Ctrl->>Ctrl: Verify CRUD permissions
+
+    Ctrl->>DB: INSERT ObjectTeamMember__c
+    DB-->>Ctrl: Success
+
+    Note over Ctrl,Queue: Trigger fires after insert
+    Ctrl->>Queue: System.enqueueJob()
+
+    Ctrl-->>LWC: Return success
+    LWC-->>User: Refresh team member list
+
+    Note over Queue: Async processing
+    Queue->>DB: INSERT [Object]Share
+    Queue->>DB: INSERT ObjectTeamMember__Share
+```
+
+## تدفق البيانات: مزامنة تغيير المالك
+
+```mermaid
+sequenceDiagram
+    actor Admin
+    participant Flow as Record-Triggered Flow
+    participant Inv as SyncOwnerInvocable
+    participant DB as Database
+    participant Queue as ShareRecordQueueable
+
+    Note over Admin: Changes record owner
+
+    Admin->>DB: UPDATE Account SET OwnerId = :newOwner
+    DB-->>Flow: Trigger: OwnerId changed
+
+    Flow->>Inv: syncOwners([recordId])
+
+    Inv->>DB: SELECT FROM ObjectTeamMember__c WHERE Role__c = 'Owner'
+    DB-->>Inv: Owner team member
+
+    Inv->>DB: SELECT OwnerId FROM Account
+    DB-->>Inv: New owner ID
+
+    alt Owner changed
+        Inv->>DB: UPDATE ObjectTeamMember__c SET User_Id__c = :newOwner
+        DB-->>Inv: Success
+
+        Inv->>Queue: System.enqueueJob()
+
+        Note over Queue: Async processing
+        Queue->>DB: DELETE old AccountShare (if not member)
+        Queue->>DB: INSERT new AccountShare
+    else Owner unchanged
+        Inv-->>Flow: success=true, "Owner unchanged"
+    end
+
+    Inv-->>Flow: SyncOwnerResult
+```
+
+## تدفق البيانات: تنظيف الأعضاء منتهي الصلاحية
+
+```mermaid
+flowchart TB
+    A["Salesforce Scheduler<br/>(2:00 AM daily)"] --> B["ExpiredTeamMemberCleanupScheduler"]
+    B --> C["ExpiredTeamMemberCleanupBatch"]
+    C --> D["Query:<br/>SELECT FROM ObjectTeamMember__c<br/>WHERE End_Date__c < TODAY()"]
+    D --> E["DELETE expired records<br/>(triggers remove shares)"]
+```
+
+## معالجة الأخطاء
+
+### طبقة التحكم
+
+- جميع الطرق العامة ملفوفة في try-catch
+- رسائل خطأ سهلة الاستخدام عبر Custom Labels
+- `AuraHandledException` لعرض الأخطاء في LWC
+
+### المعالجة غير المتزامنة
+
+- `Database.insert/update/delete(records, false)` — نجاح جزئي
+- يتم تسجيل الأخطاء الفردية، ولا تفشل الدفعة بأكملها
+- يتم تتبع إحصائيات الأخطاء في مهام batch
+
+### طبقة Trigger
+
+- نمط معالج trigger يمنع التكرار
+- تظهر الأخطاء للمستدعي لعملية DML
+
+## اعتبارات الأداء
+
+### المعالجة غير المتزامنة
+
+- تستخدم عمليات سجل المشاركة Queueable (غير محظورة)
+- تستخدم العمليات الجماعية Batchable مع حجم batch قابل للتكوين
+- لا توجد DML متزامنة على سجلات المشاركة في triggers
+
+### تحسين الاستعلامات
+
+- يتم استخدام الحقول المفهرسة في جمل WHERE
+- تنسيق `Record_Id__c` يمكّن استعلامات LIKE فعالة
+- مجموعات نتائج محدودة مع جمل LIMIT
+
+### التخزين المؤقت
+
+- `@AuraEnabled(cacheable=true)` لعمليات القراءة
+- يتم تخزين تكوين التطبيق مؤقتًا في المعاملة
+
+## بنية التكامل
+
+**لا توجد تكاملات خارجية** — هذه الحزمة تعمل بالكامل داخل Salesforce:
+
+- لا توجد استدعاءات HTTP
+- لا توجد واجهات برمجة تطبيقات خارجية
+- لا توجد Named Credentials
+- لا توجد External Objects
+- لا توجد Connected Apps
+
+### تبعيات المنصة
+
+| المكون | الاستخدام |
+|-----------|-------|
+| Apex Sharing | ينشئ/يدير سجلات المشاركة |
+| Queueable Apex | عمليات سجل المشاركة غير المتزامنة |
+| Batchable Apex | إعادة حساب المشاركة الجماعية، التنظيف |
+| Schedulable Apex | مهمة التنظيف اليومية |
+| Custom Metadata | تكوين التطبيق |
+| Lightning Web Components | واجهة المستخدم |
+| Custom Labels | الترجمة الدولية |

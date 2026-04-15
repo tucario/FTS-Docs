@@ -1,0 +1,158 @@
+---
+title: 誤検出
+description: レビューされ、誤検出または許容可能なリスクと判断されたセキュリティスキャナーの警告。
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+## サマリー
+
+| ID | ルール | 重大度 | ファイル | ステータス |
+|----|------|----------|------|--------|
+| FP-01 | ApexCRUDViolation | High | ObjectTeamMemberTriggerHandler.cls | 抑制 — トリガーコンテキスト |
+| FP-02 | ApexCRUDViolation | High | ObjectTeamMemberController.cls（TeamMemberSelector） | 抑制 — 意図的な設計 |
+| FP-03 | ApexSOQLInjection | High | ObjectTeamMemberTriggerHandler.cls | 誤検出 — 安全なソース |
+| FP-04 | ApexSOQLInjection | High | ShareRecordQueueable.cls | 誤検出 — ホワイトリスト |
+| FP-05 | ApexSOQLInjection | High | ObjectTeamMemberController.cls | 誤検出 — 安全なソース |
+| FP-06 | DebugStatements | Low | 複数のファイル | 許容可能なリスク |
+
+## 詳細な説明
+
+### FP-01：ObjectTeamMemberTriggerHandlerのApexCRUDViolation
+
+| 属性 | 値 |
+|-----------|-------|
+| ファイル | ObjectTeamMemberTriggerHandler.cls |
+| 行 | クラスレベル |
+| ルール | ApexCRUDViolation |
+| 重大度 | High |
+| ステータス | @SuppressWarningsで抑制 |
+
+**理由：** このトリガーハンドラーはトリガーコンテキストで実行され、CRUD権限は呼び出し側のコントローラー（ObjectTeamMemberController）によってすでに検証されています。ハンドラーは、Ownerレコードの自動作成や共有レコードの管理を含むシステムレベルの操作を実行し、昇格されたアクセスが必要です。
+
+**緩和策：** CRUD チェックは、DML操作がトリガーに到達する前にObjectTeamMemberControllerで実施されます。
+
+---
+
+### FP-02：TeamMemberSelectorのApexCRUDViolation
+
+| 属性 | 値 |
+|-----------|-------|
+| ファイル | ObjectTeamMemberController.cls |
+| 行 | 129-150（内部クラス） |
+| ルール | ApexCRUDViolation |
+| 重大度 | High |
+| ステータス | @SuppressWarningsで抑制 |
+
+**理由：** TeamMemberSelector内部クラスは、ユーザーがアクセスできるレコードのチームメンバーを表示できるように、意図的に「without sharing」を使用しています。これは標準のSalesforce AccountTeamMemberの動作を反映しています。
+
+**緩和策：** ユーザーはすでに表示できるレコードのLWCコンポーネントを介してのみこれにアクセスできます。recordIdパラメータは、アクセス可能なレコードのUIコンテキストから取得されます。
+
+---
+
+### FP-03：ObjectTeamMemberTriggerHandlerのApexSOQLInjection
+
+| 属性 | 値 |
+|-----------|-------|
+| ファイル | ObjectTeamMemberTriggerHandler.cls |
+| 行 | 135、305 |
+| ルール | ApexSOQLInjection |
+| 重大度 | High |
+| ステータス | 誤検出 |
+
+**理由：** 動的SOQLで使用されるオブジェクト名は、プラットフォームメソッド`Id.valueOf(actualRecordId).getSObjectType().getDescribe().getName()`を使用してSalesforce IDから導出されます。これはユーザーによって操作できません。
+
+**コードパターン：**
+
+```apex
+String objectName = Id.valueOf(actualRecordId)
+    .getSObjectType().getDescribe().getName();
+String query = 'SELECT OwnerId FROM '
+    + String.escapeSingleQuotes(objectName)
+    + ' WHERE Id = :actualRecordId';
+```
+
+**緩和策：** オブジェクト名はSalesforce IDから取得（ユーザー入力ではない）。ユーザー制御値にはバインド変数を使用。多層防御として追加のエスケープを適用。
+
+---
+
+### FP-04：ShareRecordQueueableのApexSOQLInjection
+
+| 属性 | 値 |
+|-----------|-------|
+| ファイル | ShareRecordQueueable.cls |
+| 行 | 138-141、163-167 |
+| ルール | ApexSOQLInjection |
+| 重大度 | High |
+| ステータス | 誤検出 |
+
+**理由：** 共有オブジェクト名は標準オブジェクトのハードコードされたホワイトリストから取得されるか、カスタムオブジェクトの決定論的パターンに従います。
+
+**ホワイトリスト：**
+
+```apex
+Map<String, String> standardShareObjects = new Map<String, String>{
+    'Account' => 'AccountShare',
+    'Contact' => 'ContactShare',
+    'Case' => 'CaseShare',
+    'Lead' => 'LeadShare',
+    'Opportunity' => 'OpportunityShare',
+    'Campaign' => 'CampaignShare',
+    'Order' => 'OrderShare'
+};
+```
+
+**緩和策：** オブジェクト名はホワイトリストに対して検証されます。カスタムオブジェクトは安全なパターン（`ObjectName__c` -> `ObjectName__Share`）に従います。すべてのユーザー制御値にはバインド変数を使用。
+
+---
+
+### FP-05：ObjectTeamMemberControllerのApexSOQLInjection
+
+| 属性 | 値 |
+|-----------|-------|
+| ファイル | ObjectTeamMemberController.cls |
+| 行 | 89 |
+| ルール | ApexSOQLInjection |
+| 重大度 | High |
+| ステータス | 誤検出 |
+
+**理由：** FP-03と同じ。プラットフォームAPIを使用してSalesforce IDから導出されたオブジェクト名。
+
+**緩和策：** `Id.getSObjectType().getDescribe().getName()`からのオブジェクト名。スプーフィング不可。レコードIDにはバインド変数を使用。
+
+---
+
+### FP-06：DebugStatements
+
+| 属性 | 値 |
+|-----------|-------|
+| ファイル | ObjectTeamMemberTriggerHandler.cls、ShareRecordQueueable.cls、ExpiredTeamMemberCleanupBatch.cls |
+| ルール | DebugStatements |
+| 重大度 | Low |
+| ステータス | 許容可能なリスク |
+
+**理由：** デバッグステートメントは本番環境のトラブルシューティングのために保持されています。ERROR/WARNレベルでのみログを記録し、機密データは含まれていません。
+
+**ログに記録される内容：** 例外メッセージ、レコード数、ジョブステータス情報。
+
+**緩和策：** デバッグ出力はSalesforceのDebug Log設定でフィルタリングできます。PIIや認証情報はログに記録されません。
+
+## セキュリティ制御サマリー
+
+| 制御 | ステータス | 実装 |
+|---------|--------|---------------|
+| コントローラーでのCRUDチェック | 実装済み | `isAccessible()`、`isCreateable()`、`isUpdateable()`、`isDeletable()` |
+| FLS実施 | 実装済み | Permission Setsがフィールドアクセスを制御 |
+| SOQLインジェクション防止 | 実装済み | ユーザー入力にはバインド変数、オブジェクト名にはホワイトリスト |
+| 共有モデル | 実装済み | コントローラーで`with sharing`、文書化された場所でのみ`without sharing` |
+| 入力検証 | 実装済み | Nullチェック、形式検証、ビジネスルール |
+| XSS防止 | 実装済み | LWCフレームワークが出力エンコーディングを処理 |
+
+## 外部統合
+
+| チェック | 結果 |
+|-------|--------|
+| HTTPコールアウト | なし — パッケージは外部呼び出しを行いません |
+| Named Credentials | 使用していません |
+| External Objects | 使用していません |
+| Remote Site Settings | 不要 |

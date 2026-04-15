@@ -1,0 +1,77 @@
+---
+title: "v1.0"
+description: Notas de versión de Flexible Team Share v1.0 — versión inicial.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+**Fecha de Lanzamiento:** Febrero 2026
+
+Esta es la versión inicial de Flexible Team Share, un paquete administrado de Salesforce que extiende la funcionalidad nativa de Miembros de Equipo de Cuenta para trabajar con cualquier objeto de Salesforce.
+
+## Características
+
+### Membresía de Equipo Universal
+
+Agregue miembros del equipo a cualquier objeto de Salesforce — no solo Cuentas. Cree equipos colaborativos en registros a través de objetos estándar y personalizados con uso compartido automático de registros basado en la membresía del equipo.
+
+**Objetos estándar soportados:** Account, Contact, Case, Lead, Opportunity, Campaign, Order
+
+**Objetos personalizados:** Cualquier objeto personalizado con OWD Private o Public Read Only es soportado.
+
+### Uso Compartido Automático de Registros
+
+Cuando se agrega un miembro del equipo, se crean automáticamente registros compartidos para otorgar al usuario acceso apropiado al registro padre. Los usos compartidos se actualizan cuando cambian los niveles de acceso y se eliminan cuando se eliminan los miembros del equipo. Todas las operaciones de uso compartido se ejecutan de forma asíncrona mediante Queueable Apex para escalabilidad.
+
+### Control de Acceso Basado en Roles
+
+Tres roles de miembros del equipo con capacidades distintas:
+
+| Rol | Descripción |
+|------|-------------|
+| **Owner** | Se asigna automáticamente al propietario del registro. Acceso completo de gestión de equipo. |
+| **Manager** | Puede agregar, editar y eliminar miembros del equipo. Delega la gestión del equipo. |
+| **User** | Puede ver miembros del equipo pero no puede modificar el equipo. Acceso de lectura/edición al registro. |
+
+### Asignaciones Temporales de Equipo
+
+Establezca una **End Date** en miembros del equipo para acceso con límite de tiempo. Un trabajo por lotes programado se ejecuta diariamente para limpiar membresías vencidas y revocar el acceso automáticamente.
+
+### Sincronización de Cambio de Propietario
+
+La Invocable Action `SyncOwnerInvocable` mantiene el Owner del equipo sincronizado cuando cambia el propietario del registro padre. Llamable desde Flow o Apex, completamente bulkificado. Soporta todos los objetos configurados.
+
+### Asistente de Configuración
+
+UI de administrador para habilitar el uso compartido de equipo por objeto. Alterne configuraciones activas/inactivas, programe trabajos de limpieza y gestione configuraciones de objeto todo desde una interfaz.
+
+### Componente Personalizable
+
+El componente LWC Object Team Member es configurable en Lightning App Builder:
+
+- **Card Title** — título personalizado para la tarjeta del componente
+- **Max Displayed Members** — lista contraíble con límite configurable (predeterminado: 5)
+
+### Internacionalización
+
+35 idiomas soportados mediante Custom Labels y Translation Workbench.
+
+## Permission Sets
+
+| Permission Set | Audiencia | Descripción |
+|---------------|----------|-------------|
+| **FTS_App_Access** | Administradores | Acceso completo de administrador — aplicación, pestañas, todas las clases Apex, CRUD completo + MAR |
+| **FTS_Data_Access** | Usuarios Finales | Acceso de usuario — CRUD básico en miembros del equipo, clases Apex de controlador |
+
+## Requisitos
+
+- Salesforce **Enterprise Edition** o superior
+- Los objetos deben tener OWD **Private** o **Public Read Only**
+- **Namespace:** `tucariofts`
+- **API Version:** 65.0
+
+## Limitaciones Conocidas
+
+- La sincronización de propietario requiere un Record-Triggered Flow por objeto (los paquetes administrados no pueden incluir triggers en objetos estándar)
+- No se soportan propietarios Queue como miembros del equipo (usa el usuario en ejecución en su lugar)
+- Se aplica el límite máximo de miembros del equipo por configuración de objeto

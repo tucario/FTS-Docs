@@ -1,0 +1,213 @@
+---
+title: Zarządzanie zespołem
+description: Przypadki użycia dla dodawania, edycji, usuwania i przeglądania członków zespołu.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+## Przypadek użycia 2: Dodanie członka zespołu do rekordu (Manager)
+
+### Cel
+
+Dodanie członka zespołu do rekordu Case z dostępem Read/Write.
+
+### Wymagania wstępne
+
+- Użytkownik ma Permission Set FTS_Data_Access
+- Obiekt Case jest skonfigurowany do udostępniania zespołowego
+- Użytkownik jest właścicielem rekordu LUB ma rolę Manager w rekordzie
+
+### Kroki
+
+| Krok | Akcja | Oczekiwany wynik |
+|------|--------|----------------|
+| 1 | Otwórz rekord Case | Ładuje się strona szczegółów Case |
+| 2 | Zlokalizuj komponent "Object Team" | Komponent pokazuje "No team members" lub istniejącą listę |
+| 3 | Kliknij przycisk "Add" (+) | Otwiera się okno Add Team Member |
+| 4 | Wyszukaj użytkownika "Test User" | Użytkownik pojawia się w wyszukiwaniu |
+| 5 | Wybierz użytkownika | User ID wypełniony |
+| 6 | Ustaw Access Level na "Read/Write" | Poziom dostępu wybrany |
+| 7 | Ustaw rolę na "User" | Rola wybrana |
+| 8 | (Opcjonalnie) Ustaw End Date na datę przyszłą | Data końcowa ustawiona |
+| 9 | Kliknij "Add" | Okno zamyka się, użytkownik pojawia się na liście zespołu |
+
+![Okno Add Team Member](../../../../assets/pictures/add-team-member-modal.png)
+
+### Punkty weryfikacji
+
+- [ ] Wyszukiwanie użytkownika pokazuje zdjęcie i email
+- [ ] Opcje poziomu dostępu: Read Only, Read/Write
+- [ ] Opcje roli: Manager, User (Owner niewybiralny)
+- [ ] Data końcowa musi być przyszła (błąd walidacji jeśli przeszła)
+- [ ] Duplikat członka pokazuje komunikat błędu
+- [ ] Rekord udostępnienia utworzony dla Case (sprawdź przez Setup > Sharing)
+
+---
+
+## Przypadek użycia 3: Edycja członka zespołu (Manager)
+
+### Cel
+
+Zmiana poziomu dostępu członka zespołu z Read/Write na Read Only.
+
+### Wymagania wstępne
+
+- Członek zespołu istnieje w rekordzie
+- Bieżący użytkownik ma uprawnienia menedżera
+
+### Kroki
+
+| Krok | Akcja | Oczekiwany wynik |
+|------|--------|----------------|
+| 1 | Otwórz rekord z członkami zespołu | Lista członków zespołu widoczna |
+| 2 | Kliknij ikonę menu (&#8942;) w wierszu członka zespołu | Lista rozwijana pokazuje opcje Edit/Delete |
+| 3 | Kliknij "Edit" | Okno edycji otwiera się z bieżącymi wartościami |
+| 4 | Zmień Access Level na "Read Only" | Nowa wartość wybrana |
+| 5 | Kliknij "Save" | Okno zamyka się, poziom dostępu zaktualizowany |
+
+![Okno Edit Team Member](../../../../assets/pictures/edit-team-member-modal.png)
+
+### Punkty weryfikacji
+
+- [ ] Oryginalne wartości wstępnie wypełnione w formularzu edycji
+- [ ] Użytkownika nie można zmienić (tylko do odczytu)
+- [ ] Poziom dostępu rekordu udostępnienia odpowiednio zaktualizowany
+- [ ] Wyświetlony komunikat toast o sukcesie
+
+---
+
+## Przypadek użycia 4: Usunięcie członka zespołu (Manager)
+
+### Cel
+
+Usunięcie członka zespołu z rekordu.
+
+### Wymagania wstępne
+
+- Członek zespołu istnieje w rekordzie
+- Bieżący użytkownik ma uprawnienia menedżera
+
+### Kroki
+
+| Krok | Akcja | Oczekiwany wynik |
+|------|--------|----------------|
+| 1 | Otwórz rekord z członkami zespołu | Lista członków zespołu widoczna |
+| 2 | Kliknij ikonę menu (&#8942;) w wierszu członka zespołu | Lista rozwijana pokazuje opcje Edit/Delete |
+| 3 | Kliknij "Delete" | Otwiera się okno potwierdzenia |
+| 4 | Kliknij "Delete" aby potwierdzić | Okno zamyka się, członek usunięty z listy |
+
+![Okno dialogowe potwierdzenia usunięcia](../../../../assets/pictures/delete-confirmation.png)
+
+### Punkty weryfikacji
+
+- [ ] Potwierdzenie pokazuje nazwę członka
+- [ ] Rekord udostępnienia usunięty dla obiektu nadrzędnego
+- [ ] Wyświetlony komunikat toast o sukcesie
+- [ ] Członek nie pojawia się już na liście
+
+---
+
+## Przypadek użycia 5: Przeglądanie zespołu (użytkownik końcowy)
+
+### Cel
+
+Przeglądanie członków zespołu w rekordzie, gdzie użytkownik jest członkiem zespołu.
+
+### Wymagania wstępne
+
+- Użytkownik ma Permission Set FTS_Data_Access
+- Użytkownik jest członkiem zespołu w rekordzie
+
+### Kroki
+
+| Krok | Akcja | Oczekiwany wynik |
+|------|--------|----------------|
+| 1 | Otwórz rekord, gdzie użytkownik jest członkiem zespołu | Ładuje się strona szczegółów rekordu |
+| 2 | Wyświetl komponent "Object Team" | Lista członków zespołu widoczna |
+| 3 | Wyświetl własny wpis na liście | Pokazuje nazwę, zdjęcie, rolę, poziom dostępu |
+| 4 | Jeśli więcej niż 5 członków, kliknij "Show X more" | Pełna lista się rozwija |
+| 5 | Kliknij "Show less" | Lista zwija się z powrotem do 5 członków |
+
+![Zwinięta lista członków zespołu](../../../../assets/pictures/team-members-collapsed.png)
+
+### Punkty weryfikacji
+
+- [ ] Użytkownik może zobaczyć członków zespołu
+- [ ] Przyciski Add/Edit/Delete NIE są widoczne (chyba że użytkownik jest Managerem)
+- [ ] Członek z rolą Owner pokazany z odznaką
+- [ ] Data końcowa pokazana jeśli ustawiona
+- [ ] Jeśli więcej niż 5 członków, lista jest zwinięta z przyciskiem "Show X more"
+- [ ] Kliknięcie "Show X more" rozwija pełną listę
+- [ ] Kliknięcie "Show less" zwija listę z powrotem
+- [ ] Właściciel rekordu zawsze pojawia się pierwszy na liście
+
+---
+
+## Przypadek użycia 6: Tymczasowe przypisanie zespołu
+
+### Cel
+
+Dodanie członka zespołu z datą wygaśnięcia dla dostępu tymczasowego.
+
+### Wymagania wstępne
+
+- Uprawnienia menedżera w rekordzie
+- Zaplanowane zadanie czyszczenia (opcjonalne, ale zalecane)
+
+### Kroki
+
+| Krok | Akcja | Oczekiwany wynik |
+|------|--------|----------------|
+| 1 | Dodaj członka zespołu (Przypadek użycia 2) | Okno otwarte |
+| 2 | Ustaw End Date na 7 dni od teraz | Data wybrana |
+| 3 | Zapisz | Członek dodany z pokazaną datą końcową |
+| 4 | Poczekaj, aż data końcowa minie | — |
+| 5 | Zadanie czyszczenia uruchamia się (2:00) | Członek automatycznie usunięty |
+
+![Członek zespołu z datą końcową](../../../../assets/pictures/team-members-end-date.png)
+
+### Punkty weryfikacji
+
+- [ ] Data końcowa wyświetlana na liście członków zespołu
+- [ ] Przeszła data końcowa niedozwolona (błąd walidacji)
+- [ ] Wygasłe członkowie czyszczeni przez zadanie wsadowe
+- [ ] Rekordy udostępnień usunięte po usunięciu członka
+
+---
+
+## Przypadek użycia 10: Synchronizacja zmiany właściciela
+
+### Cel
+
+Automatyczna aktualizacja właściciela zespołu, gdy zmienia się właściciel rekordu nadrzędnego.
+
+### Kontekst
+
+Gdy zmienia się pole `OwnerId` rekordu (np. konto jest przypisane do innego przedstawiciela handlowego), rekord `ObjectTeamMember__c` z `Role__c = 'Owner'` musi zostać zaktualizowany, aby odzwierciedlać nowego właściciela. Nie jest to automatyczne — wymaga Flow lub triggera Apex.
+
+### Wymagania wstępne
+
+- Udostępnianie zespołowe skonfigurowane dla obiektu
+- Członkowie zespołu istnieją w rekordach (rola Owner tworzona automatycznie)
+- Dostęp administratora do tworzenia Flow
+
+### Konfiguracja za pomocą Flow (zalecane)
+
+Zobacz [przewodnik konfiguracji](/pl/getting-started/configuration/#owner-change-synchronization) dla szczegółowych instrukcji konfiguracji.
+
+![Flow Builder - Flow synchronizacji właściciela](../../../../assets/pictures/flow-builder-owner-sync.png)
+![Akcja Sync Team Member Owner](../../../../assets/pictures/sync-owner-action-config.png)
+
+### Punkty weryfikacji
+
+- [ ] Flow wyzwala się tylko przy zmianie OwnerId
+- [ ] ObjectTeamMember__c z Role='Owner' zaktualizowany do nowego właściciela
+- [ ] Rekord udostępnienia starego właściciela usunięty (jeśli nie jest już członkiem zespołu)
+- [ ] Rekord udostępnienia nowego właściciela utworzony
+- [ ] Właściciele w postaci kolejek obsłużeni (używany uruchomiony użytkownik)
+- [ ] Operacje hurtowe obsługiwane (wiele rekordów naraz)
+
+### Obsługiwane obiekty
+
+- Account, Opportunity, Case, Lead, Campaign, Order
+- Dowolny obiekt niestandardowy z włączonym udostępnianiem zespołowym

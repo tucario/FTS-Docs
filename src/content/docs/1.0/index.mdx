@@ -1,0 +1,65 @@
+---
+title: Flexible Team Share
+description: Extend Salesforce Account Team Member functionality to any object.
+template: splash
+hero:
+  tagline: Create collaborative teams, manage access, and automate sharing — all
+    within the Salesforce platform.
+  image:
+    file: ../../../assets/1.0/logo.png
+  actions:
+    - text: Get Started
+      link: /docs/1.0/getting-started/installation/
+      icon: right-arrow
+      variant: primary
+    - text: View Architecture
+      link: /docs/1.0/architecture/overview/
+      icon: seti:config
+slug: "1.0"
+---
+
+import { Card, CardGrid } from '@astrojs/starlight/components';
+
+## Key Features
+
+<CardGrid stagger>
+  <Card title="Universal Team Membership" icon="group">
+    Add team members to any object, not just Accounts. Supports standard and custom objects with Private or Public Read Only OWD.
+  </Card>
+
+  <Card title="Automatic Record Sharing" icon="approve-check-circle">
+    Team members automatically receive appropriate access. Share records are created, updated, and removed automatically.
+  </Card>
+
+  <Card title="Role-Based Access" icon="setting">
+    Owner, Manager, and User roles with distinct permissions. Managers can add/edit/remove team members.
+  </Card>
+
+  <Card title="Temporary Assignments" icon="clock">
+    Time-limited team memberships with automatic cleanup. Set an end date and expired members are removed automatically.
+  </Card>
+</CardGrid>
+
+## Supported Objects
+
+* **Standard Objects**: Account, Contact, Case, Lead, Opportunity, Campaign, Order
+* **Custom Objects**: Any custom object with Private or Public Read Only OWD
+
+## Quick Start
+
+1. **Install** the package from AppExchange
+2. **Assign** permission sets (FTS\_App\_Access for admins, FTS\_Data\_Access for users)
+3. **Configure** objects via the Configuration Wizard
+4. **Add** the Team Member component to record pages
+
+Ready to begin? Head to the [Installation Guide](/1.0/getting-started/installation/).
+
+## Package Info
+
+| Property | Value |
+|----------|-------|
+| **Namespace** | `tucariofts` |
+| **Publisher** | Tucario |
+| **API Version** | 65.0 |
+| **Package Type** | 2GP Managed Package |
+| **Support** | hello@tucario.com |

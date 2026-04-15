@@ -1,0 +1,213 @@
+---
+title: Lanzamiento AppExchange
+description: Guía paso a paso para construir, escanear y enviar el paquete a AppExchange.
+---
+
+import { Aside, Steps } from '@astrojs/starlight/components';
+
+## Fase 1: Pre-vuelo (local)
+
+Ejecute estos antes de tocar la organización. Corrija todo lo que surja.
+
+### 1.1 Salesforce Code Analyzer v5 — escaneo completo
+
+```bash
+# Instalar (una vez)
+sf plugins install @salesforce/plugin-code-analyzer
+
+# Ejecutar TODAS las reglas (PMD, ESLint, RetireJS, Regex, Flow, CPD)
+sf code-analyzer run \
+  --workspace force-app \
+  --output-file docs/scan-results.html
+
+# Ejecutar reglas específicas de AppExchange
+sf code-analyzer run \
+  --rule-selector AppExchange \
+  --workspace force-app \
+  --output-file docs/scan-appexchange.html
+
+# Ejecutar solo reglas etiquetadas como Security
+sf code-analyzer run \
+  --rule-selector Security \
+  --workspace force-app \
+  --output-file docs/scan-security.html
+
+# Umbral de severidad — fallar en High o Critical (CI/CD)
+sf code-analyzer run \
+  --rule-selector AppExchange \
+  --workspace force-app \
+  --severity-threshold 2 \
+  --output-file docs/scan-appexchange.html
+```
+
+**Tolerancia cero en**: Critical (1) y High (2).
+Medium (3) e inferior — documentar como falsos positivos en `docs/FALSE-POSITIVES.md`.
+
+### 1.2 ESLint (LWC)
+
+```bash
+npm run lint
+```
+
+### 1.3 Pruebas Jest de LWC
+
+```bash
+npm run test:unit
+```
+
+## Fase 2: Pruebas y Cobertura en Organización
+
+### 2.1 Ejecutar todas las pruebas Apex
+
+```bash
+sf apex run test \
+  --code-coverage \
+  --result-format human \
+  --wait 10 \
+  --target-org FlexiFREE
+```
+
+**Requerido**: >= 75% de cobertura general, cada trigger debe tener cobertura.
+
+### 2.2 Verificar cobertura por clase
+
+```bash
+sf apex run test \
+  --code-coverage \
+  --result-format json \
+  --wait 10 \
+  --target-org FlexiFREE \
+  | jq '.result.coverage.coverage[]
+        | select(.coveredPercent < 75)
+        | {name, coveredPercent}'
+```
+
+## Fase 3: Construir Versión de Paquete (beta)
+
+### 3.1 Aumentar versión en sfdx-project.json
+
+```json
+"versionName": "ver 1.2.0",
+"versionNumber": "1.2.0.NEXT"
+```
+
+### 3.2 Crear versión de paquete beta
+
+```bash
+sf package version create \
+  --package FlexibleTeamShare \
+  --definition-file config/package-scratch-def.json \
+  --installation-key-bypass \
+  --wait 30 \
+  --code-coverage \
+  --skip-ancestor-check
+```
+
+### 3.3 Verificar y comprobar cobertura
+
+```bash
+sf package version list --packages FlexibleTeamShare --order-by CreatedDate --verbose
+sf package version report --package 04tXXXXXXXXXXXXXXX --verbose
+```
+
+## Fase 4: Probar Instalación
+
+### 4.1 Instalar en una organización scratch/sandbox limpia
+
+```bash
+sf package install \
+  --package 04tXXXXXXXXXXXXXXX \
+  --target-org TestOrg \
+  --wait 10
+```
+
+### 4.2 Prueba de humo
+
+- Asignar Permission Sets `FTS_App_Access` y `FTS_Data_Access`
+- Configurar una configuración de uso compartido mediante el Asistente
+- Agregar/editar/eliminar miembros del equipo en un registro
+- Verificar que se creen/eliminen registros compartidos
+- Probar como usuario no administrador (solo FTS_Data_Access)
+
+## Fase 5: Promover a Lanzamiento
+
+<Aside type="caution">
+Esto es **irreversible** — las versiones promovidas no se pueden eliminar.
+</Aside>
+
+```bash
+sf package version promote --package 04tXXXXXXXXXXXXXXX
+```
+
+## Fase 6: Portal de Seguridad de Socios — Source Scanner (Checkmarx)
+
+Esto es **obligatorio** para cualquier envío que incluya un paquete de Salesforce.
+
+<Steps>
+1. Vaya al [Portal de Seguridad de Socios](https://security.my.salesforce-sites.com/sourcescanner) usando sus credenciales de DevHub/organización de empaquetado
+2. Seleccione su versión de paquete **promovida** (lanzada)
+3. Haga clic en **Start Scan** y espere los resultados (generalmente 15-30 min)
+4. Descargue el informe
+</Steps>
+
+<Aside type="tip">
+Obtiene **3 escaneos gratuitos por revisión**. No los desperdicie en versiones beta.
+</Aside>
+
+### Manejar hallazgos
+
+- **Critical/High** — corrija el código, reconstruya, vuelva a escanear
+- **Falsos positivos** — documente en `docs/FALSE-POSITIVES.md`, adjunte al envío
+- **Low/Info** — documente la justificación, no se requiere corrección
+
+## Fase 7: Escaneo DAST (si aplica)
+
+Flexible Team Share no tiene **llamadas externas, sin UI web, sin endpoints de API** — DAST **no es aplicable**.
+
+## Fase 8: Preparar Materiales de Envío
+
+### Documentos requeridos
+
+| Material | Archivo | Notas |
+|----------|------|-------|
+| Informe Code Analyzer (completo) | `docs/scan-results.html` | De Fase 1 |
+| Informe Code Analyzer (AppExchange) | `docs/scan-appexchange.html` | De Fase 1 |
+| Informe Source Scanner | Descargado del Portal | De Fase 6 |
+| Documento de falsos positivos | `docs/FALSE-POSITIVES.md` | Explique cada hallazgo |
+| Documentación Admin/Usuario | `docs/APPLICATION-OVERVIEW.md`, `docs/USE-CASES.md` | Los revisores prueban su aplicación |
+| Guía de instalación | `docs/1. Installation Guide.md` | Configuración paso a paso |
+
+### Preparación de organización de revisión
+
+- Instale la versión de paquete **promovida**
+- **Deshabilite MFA/2FA** para que el equipo de revisión pueda iniciar sesión
+- Solo instale paquetes relacionados con esta revisión
+- Cree un usuario de prueba con acceso completo para el equipo de revisión
+- Pre-configure al menos una configuración de uso compartido funcional con datos de muestra
+
+## Fase 9: Enviar
+
+<Steps>
+1. Vaya a **AppExchange Partner Console** > Publishing > Security Review
+2. Seleccione su paquete y versión promovida
+3. Cargue todos los informes de escaneo
+4. Proporcione credenciales de inicio de sesión de la organización para el equipo de revisión
+5. Pague tarifa de $999 (para aplicaciones de pago; aplicaciones gratuitas — sin tarifa)
+6. Envíe
+</Steps>
+
+**Cronograma**: 4-6 semanas. La mayoría de las aplicaciones pasan en el segundo intento.
+
+## Resumen de Orden de Ejecución
+
+```
+Fase 1  Code Analyzer + ESLint + Jest     ← corregir problemas de código
+Fase 2  Pruebas Apex en org (>= 75%)      ← corregir brechas de cobertura
+Fase 3  Construir versión de paquete beta ← si la construcción falla, volver a Fase 2
+Fase 4  Instalar y probar en org limpia   ← si está roto, corregir y reconstruir
+Fase 5  Promover a lanzamiento            ← IRREVERSIBLE
+Fase 6  Source Scanner (Checkmarx)        ← solo en versión promovida
+Fase 7  Escaneo DAST (si aplica)          ← N/A para esta aplicación
+Fase 8  Preparar docs y org de revisión   ← empaquetar todo
+Fase 9  Enviar a AppExchange              ← esperar 4-6 semanas
+```

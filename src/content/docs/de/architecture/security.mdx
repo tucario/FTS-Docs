@@ -1,0 +1,175 @@
+---
+title: Sicherheit
+description: Sicherheitsmechanismen, Berechtigungsmodell und CRUD/FLS-Durchsetzung.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+## Berechtigungsmodell
+
+### Permission Sets
+
+```mermaid
+flowchart LR
+    subgraph PS["PERMISSION SETS"]
+        subgraph ADMIN["FTS_App_Access<br/>(Administrators)"]
+            A1["App: FlexibleTeamShare"]
+            A2["Tabs: All visible"]
+            A3["Apex: All classes"]
+            A4["Objects: Full CRUD + MAR"]
+            A5["Team_Sharing_Config: CRUD"]
+        end
+
+        subgraph USER["FTS_Data_Access<br/>(End Users)"]
+            U1["ObjectTeamMember__c: CRUD"]
+            U2["Team_Sharing_Config__c: Read"]
+            U3["Apex: Controller only"]
+            U4["No View/Modify All Records"]
+        end
+    end
+```
+
+| Permission Set | Zielgruppe | Fähigkeiten |
+|---------------|----------|-------------|
+| **FTS_App_Access** | Administratoren | Vollständiger App-Zugriff, alle Tabs, alle Apex-Klassen, vollständiges CRUD + Modify All Records auf Objekten, Team_Sharing_Config CRUD |
+| **FTS_Data_Access** | Endbenutzer | ObjectTeamMember__c CRUD, Team_Sharing_Config__c Read, nur Controller-Apex-Klassen, kein View/Modify All Records |
+
+## Zugriffskontrolllogik
+
+```mermaid
+flowchart TB
+    START["Who can manage<br/>team members?"] --> CHECK1{"System<br/>Administrator?"}
+    CHECK1 -->|Yes| ALLOWED["ALLOWED"]
+    CHECK1 -->|No| CHECK2{"Record<br/>Owner?"}
+    CHECK2 -->|Yes| ALLOWED
+    CHECK2 -->|No| CHECK3{"Team Member with<br/>Role = Manager<br/>or Owner?"}
+    CHECK3 -->|Yes| ALLOWED
+    CHECK3 -->|No| DENIED["DENIED"]
+```
+
+Die Methode `isCurrentUserManager()` bestimmt, wer Teammitglieder verwalten kann:
+
+1. **System Administrators** — immer erlaubt
+2. **Record Owners** — immer erlaubt
+3. **Teammitglieder mit Manager/Owner-Rolle** — erlaubt
+4. **Alle anderen** — verweigert
+
+## CRUD/FLS-Durchsetzung
+
+```mermaid
+flowchart LR
+    subgraph CRUD["CRUD/FLS Checks"]
+        C["Create"] --> C1["isCreateable()"]
+        U["Update"] --> U1["isUpdateable() +<br/>isCurrentUserManager()"]
+        D["Delete"] --> D1["isDeletable() +<br/>isCurrentUserManager()"]
+        R["Read"] --> R1["WITH USER_MODE"]
+    end
+
+    subgraph LOC["Execution Mode"]
+        L1["Enforced in Controller"]
+        L2["Elevated Access<br/>(without sharing)"]
+        L3["Respects OWD/Sharing"]
+    end
+
+    C1 --> L1
+    U1 --> L2
+    D1 --> L2
+    R1 --> L3
+```
+
+| Operation | Sicherheitsprüfung | Implementierung |
+|-----------|---------------|----------------|
+| Create Team Member | `Schema.sObjectType.ObjectTeamMember__c.isCreateable()` | Im Controller durchgesetzt |
+| Update Team Member | `isUpdateable()` + `isCurrentUserManager()` | Erhöhter Zugriff (without sharing) nach Autorisierung |
+| Delete Team Member | `isDeletable()` + `isCurrentUserManager()` | Erhöhter Zugriff (without sharing) nach Autorisierung |
+| Read Team Members | `WITH USER_MODE` / Freigabemodell | Respektiert OWD/Freigabe |
+
+<Aside type="note">
+Update- und Delete-Operationen verwenden erhöhten Zugriff (`without sharing`), damit Manager jedes Teammitglied im Datensatz ändern können, nicht nur die, die sie selbst erstellt haben. Die Autorisierung wird immer zuerst über `isCurrentUserManager()` geprüft.
+</Aside>
+
+## Eingabevalidierung
+
+| Eingabe | Validierung | Ort |
+|-------|-----------|----------|
+| `recordId` | Nicht leer, gültiges Salesforce-ID-Format | Controller |
+| `userId` | Nicht leer, gültige User-ID | Controller |
+| `accessLevel` | Nicht leer, gültiger Picklist-Wert | Controller + Picklist |
+| `role` | Nicht leer, gültiger Picklist-Wert | Controller + Picklist |
+| `endDate` | Muss zukünftiges Datum oder null sein | Controller + Validation Rule |
+| `objectApiName` | Abgeleitet von Salesforce-ID (keine Benutzereingabe) | Controller |
+
+### Validation Rules
+
+| Regel | Objekt | Beschreibung |
+|------|--------|-------------|
+| `End_Date_Cannot_Be_Past` | `ObjectTeamMember__c` | Verhindert Setzen des Enddatums in der Vergangenheit |
+
+## Zugriffsebenenmapping
+
+```mermaid
+flowchart LR
+    subgraph INPUT["ObjectTeamMember__c<br/>Access_Level__c"]
+        I1["Read Only"]
+        I2["Read/Write"]
+    end
+
+    subgraph OUTPUT["[Object]Share<br/>AccessLevel"]
+        O1["Read"]
+        O2["Edit"]
+    end
+
+    I1 --> O1
+    I2 --> O2
+```
+
+## Vollständige Sicherheitsübersicht
+
+```mermaid
+flowchart TB
+    subgraph PERM["Permission Sets"]
+        PS1["FTS_App_Access<br/>Administrators"]
+        PS2["FTS_Data_Access<br/>End Users"]
+    end
+
+    subgraph ACCESS["Access Control"]
+        AC1["System Admin"]
+        AC2["Record Owner"]
+        AC3["Manager/Owner Role"]
+    end
+
+    subgraph SHARE["Sharing Model"]
+        SH1["ObjectTeamMember__Share"]
+        SH2["[Object]Share"]
+    end
+
+    subgraph LEVELS["Access Levels"]
+        LV1["Read Only → Read"]
+        LV2["Read/Write → Edit"]
+    end
+
+    PERM --> ACCESS
+    ACCESS --> SHARE
+    SHARE --> LEVELS
+```
+
+## Implementierte Sicherheits-Best-Practices
+
+| Kontrolle | Status | Implementierung |
+|---------|--------|---------------|
+| CRUD-Prüfungen in Controllern | Implementiert | `isAccessible()`, `isCreateable()`, `isUpdateable()`, `isDeletable()` |
+| FLS-Durchsetzung | Implementiert | Permission Sets steuern Feldzugriff |
+| SOQL-Injection-Prävention | Implementiert | Bind-Variablen für Benutzereingaben, Whitelist für Objektnamen |
+| Freigabemodell | Implementiert | `with sharing` auf Controllern, `without sharing` nur wo dokumentiert |
+| Eingabevalidierung | Implementiert | Null-Prüfungen, Formatvalidierung, Geschäftsregeln |
+| XSS-Prävention | Implementiert | LWC-Framework verarbeitet Output-Encoding |
+
+## Sicherheit externer Integrationen
+
+| Prüfung | Ergebnis |
+|-------|--------|
+| HTTP-Callouts | Keine — Paket führt keine externen Aufrufe durch |
+| Named Credentials | Nicht verwendet |
+| External Objects | Nicht verwendet |
+| Remote Site Settings | Nicht erforderlich |
+| CSP-Verletzungen | Bestanden — keine Content-Security-Policy-Verletzungen |

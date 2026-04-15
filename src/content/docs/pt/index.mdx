@@ -1,0 +1,52 @@
+---
+title: Flexible Team Share
+description: Estenda a funcionalidade do Membro da Equipe de Conta do Salesforce para qualquer objeto.
+template: splash
+hero:
+  tagline: Crie equipes colaborativas, gerencie acessos e automatize o compartilhamento — tudo dentro da plataforma Salesforce.
+  image:
+    file: ../../../assets/logo.png
+  actions:
+    - text: Comece Agora
+      link: /docs/pt/getting-started/installation/
+      icon: right-arrow
+      variant: primary
+    - text: Ver Arquitetura
+      link: /docs/pt/architecture/overview/
+      icon: seti:config
+---
+
+import { LinkCard, CardGrid } from '@astrojs/starlight/components';
+
+## Funcionalidades Principais
+
+<CardGrid>
+	<LinkCard title="Associação Universal de Equipe" href="/docs/pt/getting-started/installation/" description="Adicione membros de equipe a qualquer objeto, não apenas Contas. Suporta objetos padrão e personalizados com OWD Private ou Public Read Only." />
+	<LinkCard title="Compartilhamento Automático de Registros" href="/docs/pt/architecture/sharing-model/" description="Membros da equipe recebem acesso apropriado automaticamente. Registros de compartilhamento são criados, atualizados e removidos automaticamente." />
+	<LinkCard title="Acesso Baseado em Funções" href="/docs/pt/architecture/security/" description="Funções Owner, Manager e User com permissões distintas. Managers podem adicionar/editar/remover membros da equipe." />
+	<LinkCard title="Atribuições Temporárias" href="/docs/pt/getting-started/configuration/#temporary-access-with-end-date" description="Associações de equipe com prazo limitado e limpeza automática. Defina uma data de término e membros expirados são removidos automaticamente." />
+</CardGrid>
+
+## Objetos Suportados
+
+- **Objetos Padrão**: Account, Contact, Case, Lead, Opportunity, Campaign, Order
+- **Objetos Personalizados**: Qualquer objeto personalizado com OWD Private ou Public Read Only
+
+## Início Rápido
+
+1. **Instale** o pacote do AppExchange
+2. **Atribua** permission sets (FTS_App_Access para admins, FTS_Data_Access para usuários)
+3. **Configure** objetos através do Configuration Wizard
+4. **Adicione** o componente Team Member às páginas de registro
+
+Pronto para começar? Acesse o [Guia de Instalação](/pt/getting-started/installation/).
+
+## Informações do Pacote
+
+| Propriedade | Valor |
+|----------|-------|
+| **Namespace** | `tucariofts` |
+| **Publisher** | Tucario |
+| **API Version** | 65.0 |
+| **Package Type** | 2GP Managed Package |
+| **Support** | hello@tucario.com |

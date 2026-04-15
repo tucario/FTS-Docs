@@ -1,0 +1,157 @@
+---
+title: Installation
+description: How to install and set up Flexible Team Share on your Salesforce org.
+slug: 1.0/getting-started/installation
+---
+
+import { Aside, Steps } from '@astrojs/starlight/components';
+
+This guide walks you through installing Flexible Team Share and completing the initial setup on your Salesforce org.
+
+![Flexible Team Share installed](../../../../assets/pictures/1.0/install-guide-1.png)
+
+## Prerequisites
+
+### Organization-Wide Defaults
+
+Before configuring Flexible Team Share, ensure that the OWD sharing settings are properly configured for the objects you want to enable team functionality on.
+
+**Required sharing settings** — for Flexible Team Share to work correctly, the object's OWD must be set to one of:
+
+* **Private** — Users can only see their own records (recommended)
+* **Public Read Only** — Users can see all records but cannot edit
+
+<Aside type="caution">
+  If the OWD is set to **Public Read/Write**, sharing records cannot grant additional access since users already have full access to all records.
+</Aside>
+
+### How to Check/Update Sharing Settings
+
+<Steps>
+  1. Go to **Setup** > **Sharing Settings**
+  2. Find the object you want to configure
+  3. Verify that the Default Access is set to **Private** or **Public Read Only**
+  4. If needed, click **Edit** to modify the settings
+</Steps>
+
+![Sharing Settings in Setup](../../../../assets/pictures/1.0/install-guide-3.png)
+
+## Installation from AppExchange
+
+![AppExchange installation screen](../../../../assets/pictures/1.0/install-guide-2.png)
+
+<Steps>
+  1. **Select "Install for Admins Only"** — We strongly recommend this option. Installing for "All Users" would grant everyone immediate access to the Admin App and the Configuration Wizard. By limiting installation to Admins, you maintain full control and can later grant access to specific users via Permission Sets.
+  2. **Acknowledge the Warning** — Check the box to confirm you are installing a non-Salesforce application.
+  3. **Confirm Installation** — Click the **Install** button to proceed.
+</Steps>
+
+## Step 1: Assign Permissions
+
+Flexible Team Share includes two Permission Set Groups with different access levels:
+
+| Permission Set Group | Description |
+|---------------------|-------------|
+| **Flexible Team Share - Admin** | Full access to team member data + access to the Admin configuration app |
+| **Flexible Team Share - User** | Access to team member data only (can view and manage team members on records) |
+
+### Assigning Permission Set Groups
+
+<Steps>
+  1. Go to **Setup** > **Permission Set Groups**
+
+  2. Click on **Flexible Team Share - Admin** or **Flexible Team Share - User**
+
+     ![Permission Set Groups list](../../../../assets/pictures/1.0/install-guide-4.png)
+
+  3. Click **Manage Assignments** > **Add Assignments**
+
+  4. Select the users and click **Next** > **Assign**
+
+     ![Assigning users to Permission Set Group](../../../../assets/pictures/1.0/install-guide-5.png)
+</Steps>
+
+<Aside type="tip">
+  Assign the **Admin** Permission Set Group to system administrators who will configure the application. Assign the **User** Permission Set Group to end users who will use team functionality on records.
+</Aside>
+
+![Permission Set Group Assignments](../../../../assets/pictures/1.0/permission-set-groups.png)
+
+## Step 2: Configure Objects
+
+Use the Configuration Wizard to enable team functionality for specific objects.
+
+### Open the Configuration Wizard
+
+<Steps>
+  1. Open the **App Launcher** (9-dot menu)
+  2. Search for and select **Flexible Team Share**
+  3. Navigate to the **Configuration** tab
+</Steps>
+
+![Configuration Wizard](../../../../assets/pictures/1.0/install-guide-6.png)
+
+### Add Object Configuration
+
+<Steps>
+  1. In the Configuration Wizard, click **Add New Configuration**
+  2. Select the object you want to enable (e.g., `Custom_Object__c` or a standard object)
+  3. Provide a label for the configuration
+  4. Click **Deploy**
+</Steps>
+
+![Add Configuration - Select Object](../../../../assets/pictures/1.0/install-guide-7.png)
+![Add Configuration - Label](../../../../assets/pictures/1.0/install-guide-8.png)
+![Add Configuration - Deploy](../../../../assets/pictures/1.0/install-guide-9.png)
+![Add Configuration - Success](../../../../assets/pictures/1.0/install-guide-10.png)
+
+The wizard will create the necessary Custom Metadata record to enable team functionality for the selected object.
+
+### Activate/Deactivate Configurations
+
+Use the toggle switch next to each configuration to activate or deactivate team functionality. Deactivating a configuration will hide the team member component on that object's records.
+
+![Active/Inactive toggle](../../../../assets/pictures/1.0/install-guide-11.png)
+
+## Step 3: Add Component to Record Pages
+
+After configuring an object, add the Team Member component to the record page layout.
+
+### Using Lightning App Builder
+
+<Steps>
+  1. Navigate to a record of the configured object
+
+  2. Click the **Gear icon** > **Edit Page**
+
+     ![Edit Page button](../../../../assets/pictures/1.0/install-guide-12.png)
+
+  3. In the Lightning App Builder, find **objectTeamMember** in the Components panel (under Custom)
+
+  4. Drag the component to the desired location on the page
+
+     ![Dragging component in App Builder](../../../../assets/pictures/1.0/install-guide-13.png)
+
+  5. Click **Save**
+
+  6. If prompted, **Activate** the page for the appropriate users/profiles
+</Steps>
+
+### Component Placement Recommendations
+
+| Location | Best For |
+|----------|----------|
+| **Right Sidebar** | Quick access without taking up main content space |
+| **Related Lists Section** | Keeps team members grouped with other related data |
+| **New Tab** | Best for complex team management scenarios |
+
+## Verification Checklist
+
+After completing the installation, verify the following:
+
+* \[ ] OWD sharing settings are configured correctly for target objects
+* \[ ] Admin users have the Admin Permission Set Group assigned
+* \[ ] End users have the User Permission Set Group assigned
+* \[ ] At least one object is configured in the Configuration Wizard
+* \[ ] Team Member component is added to the record page
+* \[ ] Cleanup scheduled job is running (see [Configuration](/1.0/getting-started/configuration/#scheduled-job))

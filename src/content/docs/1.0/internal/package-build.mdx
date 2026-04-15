@@ -1,0 +1,166 @@
+---
+title: Package Build
+description: Quick reference for building FlexibleTeamShare package versions.
+slug: 1.0/internal/package-build
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+## Prerequisites
+
+* Salesforce CLI installed (`sf`)
+* Authenticated to Dev Hub org
+* Working directory: project root
+
+## Beta Package
+
+### Build New Beta
+
+```bash
+sf package version create \
+  --package FlexibleTeamShare \
+  --definition-file config/package-scratch-def.json \
+  --installation-key-bypass \
+  --wait 30 \
+  --code-coverage \
+  --skip-ancestor-check
+```
+
+### Build Beta (with installation password)
+
+```bash
+sf package version create \
+  --package FlexibleTeamShare \
+  --definition-file config/package-scratch-def.json \
+  --installation-key YOUR_PASSWORD \
+  --wait 30 \
+  --code-coverage \
+  --skip-ancestor-check
+```
+
+<Aside type="caution">
+  Always pass `--definition-file config/package-scratch-def.json` explicitly to ensure the build org has Translation Workbench enabled. The `definitionFile` property in `sfdx-project.json` may not always be picked up reliably.
+</Aside>
+
+## Release (Promoted) Package
+
+### Step 1: List existing versions
+
+```bash
+sf package version list \
+  --packages FlexibleTeamShare \
+  --order-by CreatedDate \
+  --verbose
+```
+
+### Step 2: Promote beta to release
+
+Replace `04t...` with the actual version ID from step 1:
+
+```bash
+sf package version promote --package 04tXXXXXXXXXXXXXXX
+```
+
+## Useful Commands
+
+### Check package version details
+
+```bash
+sf package version list \
+  --packages FlexibleTeamShare \
+  --order-by CreatedDate \
+  --verbose
+```
+
+### Get installation URL
+
+```bash
+sf package version list \
+  --packages FlexibleTeamShare \
+  --order-by CreatedDate \
+  --verbose --json
+```
+
+Look for `SubscriberPackageVersionId` (starts with `04t`).
+
+Installation URL format:
+
+```
+https://login.salesforce.com/packaging/installPackage.apexp?p0=04tXXXXXXXXXXXXXXX
+```
+
+### Check code coverage
+
+```bash
+sf package version report --package 04tXXXXXXXXXXXXXXX --verbose
+```
+
+### Delete failed/unwanted version
+
+```bash
+sf package version delete --package 04tXXXXXXXXXXXXXXX --no-prompt
+```
+
+## Version Numbering
+
+Configured in `sfdx-project.json`:
+
+| Field | Example | Description |
+|-------|---------|-------------|
+| `versionNumber` | `1.0.0.NEXT` | MAJOR.MINOR.PATCH.BUILD |
+| `NEXT` | auto | Auto-increments build number |
+
+### Bump version manually
+
+Edit `sfdx-project.json`:
+
+```json
+"versionNumber": "1.1.0.NEXT"
+```
+
+## Common Issues
+
+### "Ancestor version required"
+
+Add `--skip-ancestor-check` flag or set ancestor in `sfdx-project.json`.
+
+### "Code coverage below 75%"
+
+Run tests locally first:
+
+```bash
+sf apex run test --code-coverage --result-format human --wait 10
+```
+
+### "Translation languages not available"
+
+1. Ensure `definitionFile` is set in `sfdx-project.json`
+2. Ensure `config/package-scratch-def.json` has Enterprise edition and all three language settings:
+
+```json
+{
+  "orgName": "Package Build Org",
+  "edition": "Enterprise",
+  "features": ["EnableSetPasswordInApi"],
+  "settings": {
+    "lightningExperienceSettings": {
+      "enableS1DesktopEnabled": true
+    },
+    "languageSettings": {
+      "enableTranslationWorkbench": true,
+      "enableEndUserLanguages": true,
+      "enablePlatformLanguages": true
+    }
+  }
+}
+```
+
+## Quick Reference
+
+| Action | Command |
+|--------|---------|
+| Build beta | `sf package version create --package FlexibleTeamShare --definition-file config/package-scratch-def.json --installation-key-bypass --wait 30 --code-coverage --skip-ancestor-check` |
+| List versions | `sf package version list --packages FlexibleTeamShare --order-by CreatedDate --verbose` |
+| Promote to release | `sf package version promote --package 04tXXX...` |
+| Check coverage | `sf package version report --package 04tXXX... --verbose` |
+| Delete version | `sf package version delete --package 04tXXX... --no-prompt` |

@@ -1,0 +1,213 @@
+---
+title: Gerenciar Equipe
+description: Casos de uso para adicionar, editar, remover e visualizar membros da equipe.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+## Caso de Uso 2: Adicionar Membro da Equipe ao Registro (Manager)
+
+### Objetivo
+
+Adicionar um membro da equipe a um registro Case com acesso Read/Write.
+
+### Pré-requisitos
+
+- Usuário tem permission set FTS_Data_Access
+- Objeto Case está configurado para compartilhamento de equipe
+- Usuário é owner do registro OU tem função Manager no registro
+
+### Passos
+
+| Passo | Ação | Resultado Esperado |
+|------|--------|----------------|
+| 1 | Abrir um registro Case | Página de detalhes do Case carrega |
+| 2 | Localizar componente "Object Team" | Componente mostra "No team members" ou lista existente |
+| 3 | Clicar no botão "Add" (+) | Modal Add Team Member abre |
+| 4 | Pesquisar usuário "Test User" | Usuário aparece na lookup |
+| 5 | Selecionar usuário | ID do usuário preenchido |
+| 6 | Definir Access Level como "Read/Write" | Nível de acesso selecionado |
+| 7 | Definir Role como "User" | Função selecionada |
+| 8 | (Opcional) Definir End Date para data futura | Data de término definida |
+| 9 | Clicar "Add" | Modal fecha, usuário aparece na lista da equipe |
+
+![Modal Add Team Member](../../../../assets/pictures/add-team-member-modal.png)
+
+### Pontos de Validação
+
+- [ ] Lookup de usuário mostra foto e email
+- [ ] Opções de nível de acesso: Read Only, Read/Write
+- [ ] Opções de função: Manager, User (Owner não selecionável)
+- [ ] Data de término deve ser futura (erro de validação se passada)
+- [ ] Membro duplicado mostra mensagem de erro
+- [ ] Registro de compartilhamento criado para Case (verificar via Setup > Sharing)
+
+---
+
+## Caso de Uso 3: Editar Membro da Equipe (Manager)
+
+### Objetivo
+
+Alterar o nível de acesso de um membro da equipe de Read/Write para Read Only.
+
+### Pré-requisitos
+
+- Membro da equipe existe no registro
+- Usuário atual tem permissões de manager
+
+### Passos
+
+| Passo | Ação | Resultado Esperado |
+|------|--------|----------------|
+| 1 | Abrir registro com membros da equipe | Lista de membros da equipe visível |
+| 2 | Clicar no ícone de menu (&#8942;) na linha do membro da equipe | Dropdown mostra opções Edit/Delete |
+| 3 | Clicar "Edit" | Modal de edição abre com valores atuais |
+| 4 | Alterar Access Level para "Read Only" | Novo valor selecionado |
+| 5 | Clicar "Save" | Modal fecha, nível de acesso atualizado |
+
+![Modal Edit Team Member](../../../../assets/pictures/edit-team-member-modal.png)
+
+### Pontos de Validação
+
+- [ ] Valores originais pré-preenchidos no formulário de edição
+- [ ] Usuário não pode ser alterado (somente leitura)
+- [ ] Nível de acesso do registro de compartilhamento atualizado adequadamente
+- [ ] Mensagem toast de sucesso exibida
+
+---
+
+## Caso de Uso 4: Remover Membro da Equipe (Manager)
+
+### Objetivo
+
+Remover um membro da equipe de um registro.
+
+### Pré-requisitos
+
+- Membro da equipe existe no registro
+- Usuário atual tem permissões de manager
+
+### Passos
+
+| Passo | Ação | Resultado Esperado |
+|------|--------|----------------|
+| 1 | Abrir registro com membros da equipe | Lista de membros da equipe visível |
+| 2 | Clicar no ícone de menu (&#8942;) na linha do membro da equipe | Dropdown mostra opções Edit/Delete |
+| 3 | Clicar "Delete" | Modal de confirmação abre |
+| 4 | Clicar "Delete" para confirmar | Modal fecha, membro removido da lista |
+
+![Diálogo de confirmação de exclusão](../../../../assets/pictures/delete-confirmation.png)
+
+### Pontos de Validação
+
+- [ ] Confirmação mostra nome do membro
+- [ ] Registro de compartilhamento excluído para objeto pai
+- [ ] Mensagem toast de sucesso exibida
+- [ ] Membro não aparece mais na lista
+
+---
+
+## Caso de Uso 5: Visualizar Equipe (Usuário Final)
+
+### Objetivo
+
+Visualizar membros da equipe em um registro onde o usuário é membro da equipe.
+
+### Pré-requisitos
+
+- Usuário tem permission set FTS_Data_Access
+- Usuário é membro da equipe no registro
+
+### Passos
+
+| Passo | Ação | Resultado Esperado |
+|------|--------|----------------|
+| 1 | Abrir um registro onde usuário é membro da equipe | Página de detalhes do registro carrega |
+| 2 | Visualizar componente "Object Team" | Lista de membros da equipe visível |
+| 3 | Visualizar própria entrada na lista | Mostra nome, foto, função, nível de acesso |
+| 4 | Se mais de 5 membros, clicar "Show X more" | Lista completa expande |
+| 5 | Clicar "Show less" | Lista colapsa de volta para 5 membros |
+
+![Lista de membros da equipe colapsada](../../../../assets/pictures/team-members-collapsed.png)
+
+### Pontos de Validação
+
+- [ ] Usuário pode ver membros da equipe
+- [ ] Botões Add/Edit/Delete NÃO visíveis (a menos que usuário seja Manager)
+- [ ] Membro com função Owner mostrado com badge
+- [ ] Data de término mostrada se definida
+- [ ] Se mais de 5 membros, lista é colapsada com botão "Show X more"
+- [ ] Clicar "Show X more" expande lista completa
+- [ ] Clicar "Show less" colapsa lista de volta
+- [ ] Owner do registro sempre aparece primeiro na lista
+
+---
+
+## Caso de Uso 6: Atribuição Temporária de Equipe
+
+### Objetivo
+
+Adicionar um membro da equipe com data de expiração para acesso temporário.
+
+### Pré-requisitos
+
+- Permissões de Manager no registro
+- Cleanup job agendado (opcional mas recomendado)
+
+### Passos
+
+| Passo | Ação | Resultado Esperado |
+|------|--------|----------------|
+| 1 | Adicionar membro da equipe (Caso de Uso 2) | Modal aberto |
+| 2 | Definir End Date para 7 dias a partir de hoje | Data selecionada |
+| 3 | Salvar | Membro adicionado com data de término mostrada |
+| 4 | Aguardar data de término passar | — |
+| 5 | Cleanup job executa (2:00 AM) | Membro automaticamente removido |
+
+![Membro da equipe com End Date](../../../../assets/pictures/team-members-end-date.png)
+
+### Pontos de Validação
+
+- [ ] Data de término exibida na lista de membros da equipe
+- [ ] Data de término passada não permitida (erro de validação)
+- [ ] Membros expirados limpos por batch job
+- [ ] Registros de compartilhamento removidos quando membro excluído
+
+---
+
+## Caso de Uso 10: Sincronização de Mudança de Owner
+
+### Objetivo
+
+Atualizar automaticamente o Owner da equipe quando o owner do registro pai muda.
+
+### Contexto
+
+Quando o campo `OwnerId` de um registro muda (ex: Conta reatribuída a outro representante de vendas), o registro `ObjectTeamMember__c` com `Role__c = 'Owner'` deve ser atualizado para refletir o novo owner. Isso não é automático — requer um Flow ou Apex trigger.
+
+### Pré-requisitos
+
+- Compartilhamento de equipe configurado para o objeto
+- Membros da equipe existem em registros (função Owner criada automaticamente)
+- Acesso de Admin para criar Flows
+
+### Configuração via Flow (Recomendado)
+
+Veja o [guia de Configuration](/pt/getting-started/configuration/#owner-change-synchronization) para instruções detalhadas de configuração.
+
+![Flow Builder - Owner Sync Flow](../../../../assets/pictures/flow-builder-owner-sync.png)
+![Ação Sync Team Member Owner](../../../../assets/pictures/sync-owner-action-config.png)
+
+### Pontos de Validação
+
+- [ ] Flow dispara apenas quando OwnerId muda
+- [ ] ObjectTeamMember__c com Role='Owner' atualizado para novo owner
+- [ ] Registro de compartilhamento do owner antigo removido (se não for ainda membro)
+- [ ] Registro de compartilhamento do novo owner criado
+- [ ] Queue owners tratados (usa usuário em execução)
+- [ ] Operações em massa suportadas (múltiplos registros de uma vez)
+
+### Objetos Suportados
+
+- Account, Opportunity, Case, Lead, Campaign, Order
+- Qualquer objeto personalizado com compartilhamento de equipe habilitado

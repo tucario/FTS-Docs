@@ -1,0 +1,164 @@
+---
+title: بناء الحزمة
+description: مرجع سريع لبناء إصدارات حزمة FlexibleTeamShare.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+## المتطلبات الأساسية
+
+- تثبيت Salesforce CLI (`sf`)
+- المصادقة على مؤسسة Dev Hub
+- دليل العمل: جذر المشروع
+
+## حزمة Beta
+
+### بناء Beta جديد
+
+```bash
+sf package version create \
+  --package FlexibleTeamShare \
+  --definition-file config/package-scratch-def.json \
+  --installation-key-bypass \
+  --wait 30 \
+  --code-coverage \
+  --skip-ancestor-check
+```
+
+### بناء Beta (مع كلمة مرور التثبيت)
+
+```bash
+sf package version create \
+  --package FlexibleTeamShare \
+  --definition-file config/package-scratch-def.json \
+  --installation-key YOUR_PASSWORD \
+  --wait 30 \
+  --code-coverage \
+  --skip-ancestor-check
+```
+
+<Aside type="caution">
+قم دائمًا بتمرير `--definition-file config/package-scratch-def.json` بشكل صريح لضمان أن مؤسسة البناء لديها Translation Workbench ممكّنة. قد لا يتم التقاط خاصية `definitionFile` في `sfdx-project.json` بشكل موثوق دائمًا.
+</Aside>
+
+## حزمة الإصدار (المروّجة)
+
+### الخطوة 1: سرد الإصدارات الموجودة
+
+```bash
+sf package version list \
+  --packages FlexibleTeamShare \
+  --order-by CreatedDate \
+  --verbose
+```
+
+### الخطوة 2: ترويج beta إلى إصدار
+
+استبدل `04t...` بمعرف الإصدار الفعلي من الخطوة 1:
+
+```bash
+sf package version promote --package 04tXXXXXXXXXXXXXXX
+```
+
+## أوامر مفيدة
+
+### التحقق من تفاصيل إصدار الحزمة
+
+```bash
+sf package version list \
+  --packages FlexibleTeamShare \
+  --order-by CreatedDate \
+  --verbose
+```
+
+### الحصول على رابط التثبيت
+
+```bash
+sf package version list \
+  --packages FlexibleTeamShare \
+  --order-by CreatedDate \
+  --verbose --json
+```
+
+ابحث عن `SubscriberPackageVersionId` (يبدأ بـ `04t`).
+
+تنسيق رابط التثبيت:
+```
+https://login.salesforce.com/packaging/installPackage.apexp?p0=04tXXXXXXXXXXXXXXX
+```
+
+### التحقق من تغطية الكود
+
+```bash
+sf package version report --package 04tXXXXXXXXXXXXXXX --verbose
+```
+
+### حذف إصدار فاشل/غير مرغوب فيه
+
+```bash
+sf package version delete --package 04tXXXXXXXXXXXXXXX --no-prompt
+```
+
+## ترقيم الإصدارات
+
+مكوّن في `sfdx-project.json`:
+
+| الحقل | مثال | الوصف |
+|-------|---------|-------------|
+| `versionNumber` | `1.0.0.NEXT` | MAJOR.MINOR.PATCH.BUILD |
+| `NEXT` | auto | يزيد رقم البناء تلقائيًا |
+
+### زيادة الإصدار يدويًا
+
+عدّل `sfdx-project.json`:
+
+```json
+"versionNumber": "1.1.0.NEXT"
+```
+
+## المشاكل الشائعة
+
+### "Ancestor version required"
+
+أضف العلم `--skip-ancestor-check` أو اضبط ancestor في `sfdx-project.json`.
+
+### "Code coverage below 75%"
+
+قم بتشغيل الاختبارات محليًا أولاً:
+
+```bash
+sf apex run test --code-coverage --result-format human --wait 10
+```
+
+### "Translation languages not available"
+
+1. تأكد من تعيين `definitionFile` في `sfdx-project.json`
+2. تأكد من أن `config/package-scratch-def.json` لديه إصدار Enterprise وجميع إعدادات اللغة الثلاثة:
+
+```json
+{
+  "orgName": "Package Build Org",
+  "edition": "Enterprise",
+  "features": ["EnableSetPasswordInApi"],
+  "settings": {
+    "lightningExperienceSettings": {
+      "enableS1DesktopEnabled": true
+    },
+    "languageSettings": {
+      "enableTranslationWorkbench": true,
+      "enableEndUserLanguages": true,
+      "enablePlatformLanguages": true
+    }
+  }
+}
+```
+
+## مرجع سريع
+
+| الإجراء | الأمر |
+|--------|---------|
+| بناء beta | `sf package version create --package FlexibleTeamShare --definition-file config/package-scratch-def.json --installation-key-bypass --wait 30 --code-coverage --skip-ancestor-check` |
+| سرد الإصدارات | `sf package version list --packages FlexibleTeamShare --order-by CreatedDate --verbose` |
+| الترويج للإصدار | `sf package version promote --package 04tXXX...` |
+| التحقق من التغطية | `sf package version report --package 04tXXX... --verbose` |
+| حذف الإصدار | `sf package version delete --package 04tXXX... --no-prompt` |

@@ -1,0 +1,122 @@
+---
+title: Security Scan Report
+description: Static code analysis results and security best practices.
+slug: 1.0/internal/security-scan
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+## Scanning Tools Used
+
+| Tool | Version | Purpose |
+|------|---------|---------|
+| Salesforce Code Analyzer v5 | Latest | Apex/LWC security analysis |
+| PMD (incl. AppExchange rules) | v5 | Code quality & security |
+| ESLint | v5 | JavaScript/LWC analysis |
+| RetireJS | v5 | Vulnerable JS libraries |
+| Partner Security Portal (Checkmarx) | Latest | Mandatory source scan |
+
+## How to Generate Scan Reports
+
+### Prerequisites
+
+```bash
+# Install Salesforce CLI
+npm install -g @salesforce/cli
+
+# Install Code Analyzer v5 plugin
+sf plugins install @salesforce/plugin-code-analyzer
+```
+
+### Run Full Scan
+
+```bash
+# Run all rules with HTML output
+sf code-analyzer run --workspace force-app --output-file docs/scan-results.html
+
+# Run AppExchange-specific rules
+sf code-analyzer run --rule-selector AppExchange --workspace force-app --output-file docs/scan-appexchange.html
+
+# Run Security-tagged rules only
+sf code-analyzer run --rule-selector Security --workspace force-app --output-file docs/scan-security.html
+
+# Fail on High or Critical (CI/CD)
+sf code-analyzer run --rule-selector AppExchange --workspace force-app --severity-threshold 2 --output-file docs/scan-appexchange.html
+```
+
+## Security Best Practices Implemented
+
+### CRUD/FLS Enforcement
+
+* `isCreateable()` check before INSERT
+* `isUpdateable()` check before UPDATE
+* `isDeletable()` check before DELETE
+* Field-level permissions via Permission Sets
+
+### SOQL Injection Prevention
+
+* Bind variables used for user input
+* `String.escapeSingleQuotes()` for dynamic queries
+* Object names derived from Salesforce IDs (not user input)
+
+### Sharing Model Compliance
+
+* `with sharing` on main controllers
+* `without sharing` only where documented and necessary
+* Share records respect OWD settings
+
+### LWC Security
+
+* No `eval()` or dynamic script execution
+* User input sanitized before display
+* No hardcoded credentials
+
+## External Integration Security
+
+| Check | Status | Notes |
+|-------|--------|-------|
+| HTTP Callouts | N/A | Package makes no external calls |
+| Named Credentials | N/A | Not used |
+| External Objects | N/A | Not used |
+| Remote Site Settings | N/A | Not required |
+| CSP Violations | Pass | No Content-Security-Policy violations |
+
+## Apex Test Coverage
+
+| Class | Coverage | Status |
+|-------|----------|--------|
+| ObjectTeamMemberController | >75% | Pass |
+| TeamMemberWizardController | >75% | Pass |
+| ShareRecordQueueable | >75% | Pass |
+| SharingRecalculationBatch | >75% | Pass |
+| ExpiredTeamMemberCleanupBatch | >75% | Pass |
+| ObjectTeamMemberTriggerHandler | >75% | Pass |
+| PostInstallHandler | >75% | Pass |
+| **Overall** | **>75%** | **Pass** |
+
+### How to Run Tests with Coverage
+
+```bash
+# Run all tests with coverage
+sf apex run test --code-coverage --result-format human --target-org [ORG_ALIAS]
+
+# Run specific test class
+sf apex run test --tests ObjectTeamMemberTest --code-coverage --result-format human --target-org [ORG_ALIAS]
+```
+
+## Scanner Commands Reference (Code Analyzer v5)
+
+```bash
+# List available rules
+sf code-analyzer rules
+
+# List AppExchange rules only
+sf code-analyzer rules --rule-selector AppExchange
+
+# Run with specific rule selector
+sf code-analyzer run --rule-selector Security --workspace force-app
+
+# Export to various formats
+sf code-analyzer run --workspace force-app --output-file results.html
+sf code-analyzer run --workspace force-app --output-file results.sarif
+```

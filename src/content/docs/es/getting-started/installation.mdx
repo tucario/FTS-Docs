@@ -1,0 +1,151 @@
+---
+title: Instalación
+description: Cómo instalar y configurar Flexible Team Share en su organización de Salesforce.
+---
+
+import { Aside, Steps } from '@astrojs/starlight/components';
+
+Esta guía le explica cómo instalar Flexible Team Share y completar la configuración inicial en su organización de Salesforce.
+
+![Flexible Team Share installed](../../../../assets/pictures/install-guide-1.png)
+
+## Requisitos Previos
+
+### Valores Predeterminados de Toda la Organización
+
+Antes de configurar Flexible Team Share, asegúrese de que la configuración de uso compartido OWD esté correctamente configurada para los objetos en los que desea habilitar la funcionalidad de equipo.
+
+**Configuración de uso compartido requerida** — para que Flexible Team Share funcione correctamente, el OWD del objeto debe establecerse en uno de los siguientes:
+
+- **Private** — Los usuarios solo pueden ver sus propios registros (recomendado)
+- **Public Read Only** — Los usuarios pueden ver todos los registros pero no pueden editarlos
+
+<Aside type="caution">
+Si el OWD está establecido en **Public Read/Write**, los registros compartidos no pueden otorgar acceso adicional ya que los usuarios ya tienen acceso completo a todos los registros.
+</Aside>
+
+### Cómo Verificar/Actualizar la Configuración de Uso Compartido
+
+<Steps>
+1. Vaya a **Setup** > **Sharing Settings**
+2. Encuentre el objeto que desea configurar
+3. Verifique que el Default Access esté establecido en **Private** o **Public Read Only**
+4. Si es necesario, haga clic en **Edit** para modificar la configuración
+</Steps>
+
+![Sharing Settings in Setup](../../../../assets/pictures/install-guide-3.png)
+
+## Instalación desde AppExchange
+
+![AppExchange installation screen](../../../../assets/pictures/install-guide-2.png)
+
+<Steps>
+1. **Seleccione "Install for Admins Only"** — Recomendamos encarecidamente esta opción. Instalar para "All Users" otorgaría a todos acceso inmediato a la aplicación de administración y al Asistente de Configuración. Al limitar la instalación a Administradores, mantiene el control total y puede otorgar acceso posteriormente a usuarios específicos mediante Permission Sets.
+2. **Reconozca la Advertencia** — Marque la casilla para confirmar que está instalando una aplicación que no es de Salesforce.
+3. **Confirme la Instalación** — Haga clic en el botón **Install** para proceder.
+</Steps>
+
+## Paso 1: Asignar Permisos
+
+Flexible Team Share incluye dos Permission Set Groups con diferentes niveles de acceso:
+
+| Permission Set Group | Descripción |
+|---------------------|-------------|
+| **Flexible Team Share - Admin** | Acceso completo a los datos de miembros del equipo + acceso a la aplicación de configuración de administrador |
+| **Flexible Team Share - User** | Acceso solo a los datos de miembros del equipo (puede ver y gestionar miembros del equipo en registros) |
+
+### Asignación de Permission Set Groups
+
+<Steps>
+1. Vaya a **Setup** > **Permission Set Groups**
+2. Haga clic en **Flexible Team Share - Admin** o **Flexible Team Share - User**
+
+   ![Permission Set Groups list](../../../../assets/pictures/install-guide-4.png)
+
+3. Haga clic en **Manage Assignments** > **Add Assignments**
+4. Seleccione los usuarios y haga clic en **Next** > **Assign**
+
+   ![Assigning users to Permission Set Group](../../../../assets/pictures/install-guide-5.png)
+</Steps>
+
+<Aside type="tip">
+Asigne el Permission Set Group **Admin** a los administradores del sistema que configurarán la aplicación. Asigne el Permission Set Group **User** a los usuarios finales que utilizarán la funcionalidad de equipo en los registros.
+</Aside>
+
+![Permission Set Group Assignments](../../../../assets/pictures/permission-set-groups.png)
+
+## Paso 2: Configurar Objetos
+
+Use el Asistente de Configuración para habilitar la funcionalidad de equipo para objetos específicos.
+
+### Abrir el Asistente de Configuración
+
+<Steps>
+1. Abra el **App Launcher** (menú de 9 puntos)
+2. Busque y seleccione **Flexible Team Share**
+3. Navegue a la pestaña **Configuration**
+</Steps>
+
+![Configuration Wizard](../../../../assets/pictures/install-guide-6.png)
+
+### Agregar Configuración de Objeto
+
+<Steps>
+1. En el Asistente de Configuración, haga clic en **Add New Configuration**
+2. Seleccione el objeto que desea habilitar (por ejemplo, `Custom_Object__c` o un objeto estándar)
+3. Proporcione una etiqueta para la configuración
+4. Haga clic en **Deploy**
+</Steps>
+
+![Add Configuration - Select Object](../../../../assets/pictures/install-guide-7.png)
+![Add Configuration - Label](../../../../assets/pictures/install-guide-8.png)
+![Add Configuration - Deploy](../../../../assets/pictures/install-guide-9.png)
+![Add Configuration - Success](../../../../assets/pictures/install-guide-10.png)
+
+El asistente creará el registro Custom Metadata necesario para habilitar la funcionalidad de equipo para el objeto seleccionado.
+
+### Activar/Desactivar Configuraciones
+
+Use el interruptor junto a cada configuración para activar o desactivar la funcionalidad de equipo. Desactivar una configuración ocultará el componente de miembro de equipo en los registros de ese objeto.
+
+![Active/Inactive toggle](../../../../assets/pictures/install-guide-11.png)
+
+## Paso 3: Agregar Componente a Páginas de Registro
+
+Después de configurar un objeto, agregue el componente Miembro de Equipo al diseño de la página de registro.
+
+### Usando Lightning App Builder
+
+<Steps>
+1. Navegue a un registro del objeto configurado
+2. Haga clic en el **icono de Engranaje** > **Edit Page**
+
+   ![Edit Page button](../../../../assets/pictures/install-guide-12.png)
+
+3. En Lightning App Builder, encuentre **objectTeamMember** en el panel Components (bajo Custom)
+4. Arrastre el componente a la ubicación deseada en la página
+
+   ![Dragging component in App Builder](../../../../assets/pictures/install-guide-13.png)
+
+5. Haga clic en **Save**
+6. Si se le solicita, **Active** la página para los usuarios/perfiles apropiados
+</Steps>
+
+### Recomendaciones de Ubicación del Componente
+
+| Ubicación | Mejor Para |
+|----------|----------|
+| **Right Sidebar** | Acceso rápido sin ocupar espacio de contenido principal |
+| **Related Lists Section** | Mantiene los miembros del equipo agrupados con otros datos relacionados |
+| **New Tab** | Mejor para escenarios complejos de gestión de equipos |
+
+## Lista de Verificación
+
+Después de completar la instalación, verifique lo siguiente:
+
+- [ ] La configuración de uso compartido OWD está configurada correctamente para los objetos objetivo
+- [ ] Los usuarios administradores tienen asignado el Admin Permission Set Group
+- [ ] Los usuarios finales tienen asignado el User Permission Set Group
+- [ ] Al menos un objeto está configurado en el Asistente de Configuración
+- [ ] El componente Miembro de Equipo está agregado a la página de registro
+- [ ] El trabajo programado de limpieza está ejecutándose (vea [Configuración](/es/getting-started/configuration/#scheduled-job))

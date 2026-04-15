@@ -1,0 +1,151 @@
+---
+title: Instalacja
+description: Jak zainstalować i skonfigurować Flexible Team Share w organizacji Salesforce.
+---
+
+import { Aside, Steps } from '@astrojs/starlight/components';
+
+Niniejszy przewodnik przeprowadza przez proces instalacji Flexible Team Share i wykonanie wstępnej konfiguracji w organizacji Salesforce.
+
+![Flexible Team Share zainstalowany](../../../../assets/pictures/install-guide-1.png)
+
+## Wymagania wstępne
+
+### Organization-Wide Defaults
+
+Przed skonfigurowaniem Flexible Team Share należy upewnić się, że ustawienia udostępniania OWD są odpowiednio skonfigurowane dla obiektów, dla których planuje się włączyć funkcjonalność zespołów.
+
+**Wymagane ustawienia udostępniania** — aby Flexible Team Share działał poprawnie, OWD obiektu musi być ustawione na:
+
+- **Private** — użytkownicy widzą tylko swoje własne rekordy (zalecane)
+- **Public Read Only** — użytkownicy widzą wszystkie rekordy, ale nie mogą ich edytować
+
+<Aside type="caution">
+Jeśli OWD jest ustawione na **Public Read/Write**, rekordy udostępnień nie mogą przyznać dodatkowego dostępu, ponieważ użytkownicy mają już pełny dostęp do wszystkich rekordów.
+</Aside>
+
+### Jak sprawdzić/zaktualizować ustawienia udostępniania
+
+<Steps>
+1. Przejdź do **Setup** > **Sharing Settings**
+2. Znajdź obiekt, który chcesz skonfigurować
+3. Sprawdź, czy Default Access jest ustawiony na **Private** lub **Public Read Only**
+4. W razie potrzeby kliknij **Edit**, aby zmodyfikować ustawienia
+</Steps>
+
+![Ustawienia udostępniania w Setup](../../../../assets/pictures/install-guide-3.png)
+
+## Instalacja z AppExchange
+
+![Ekran instalacji AppExchange](../../../../assets/pictures/install-guide-2.png)
+
+<Steps>
+1. **Wybierz "Install for Admins Only"** — zalecamy tę opcję. Instalacja dla "All Users" przyznałaby wszystkim natychmiastowy dostęp do aplikacji Admin i Configuration Wizard. Ograniczając instalację do administratorów, zachowujesz pełną kontrolę i możesz później przyznać dostęp konkretnym użytkownikom za pomocą Permission Sets.
+2. **Potwierdź ostrzeżenie** — zaznacz pole, aby potwierdzić instalację aplikacji spoza Salesforce.
+3. **Potwierdź instalację** — kliknij przycisk **Install**, aby kontynuować.
+</Steps>
+
+## Krok 1: Przypisanie uprawnień
+
+Flexible Team Share zawiera dwa Permission Set Groups o różnych poziomach dostępu:
+
+| Permission Set Group | Opis |
+|---------------------|-------------|
+| **Flexible Team Share - Admin** | Pełny dostęp do danych członków zespołu + dostęp do aplikacji konfiguracyjnej Admin |
+| **Flexible Team Share - User** | Dostęp tylko do danych członków zespołu (możliwość przeglądania i zarządzania członkami zespołu w rekordach) |
+
+### Przypisywanie Permission Set Groups
+
+<Steps>
+1. Przejdź do **Setup** > **Permission Set Groups**
+2. Kliknij na **Flexible Team Share - Admin** lub **Flexible Team Share - User**
+
+   ![Lista Permission Set Groups](../../../../assets/pictures/install-guide-4.png)
+
+3. Kliknij **Manage Assignments** > **Add Assignments**
+4. Wybierz użytkowników i kliknij **Next** > **Assign**
+
+   ![Przypisywanie użytkowników do Permission Set Group](../../../../assets/pictures/install-guide-5.png)
+</Steps>
+
+<Aside type="tip">
+Przypisz **Admin** Permission Set Group administratorom systemu, którzy będą konfigurować aplikację. Przypisz **User** Permission Set Group użytkownikom końcowym, którzy będą korzystać z funkcjonalności zespołów w rekordach.
+</Aside>
+
+![Przypisania Permission Set Group](../../../../assets/pictures/permission-set-groups.png)
+
+## Krok 2: Konfiguracja obiektów
+
+Użyj Configuration Wizard, aby włączyć funkcjonalność zespołów dla konkretnych obiektów.
+
+### Otwarcie Configuration Wizard
+
+<Steps>
+1. Otwórz **App Launcher** (menu 9 kropek)
+2. Wyszukaj i wybierz **Flexible Team Share**
+3. Przejdź do zakładki **Configuration**
+</Steps>
+
+![Configuration Wizard](../../../../assets/pictures/install-guide-6.png)
+
+### Dodanie konfiguracji obiektu
+
+<Steps>
+1. W Configuration Wizard kliknij **Add New Configuration**
+2. Wybierz obiekt, który chcesz włączyć (np. `Custom_Object__c` lub obiekt standardowy)
+3. Podaj etykietę dla konfiguracji
+4. Kliknij **Deploy**
+</Steps>
+
+![Dodaj konfigurację - Wybór obiektu](../../../../assets/pictures/install-guide-7.png)
+![Dodaj konfigurację - Etykieta](../../../../assets/pictures/install-guide-8.png)
+![Dodaj konfigurację - Deploy](../../../../assets/pictures/install-guide-9.png)
+![Dodaj konfigurację - Sukces](../../../../assets/pictures/install-guide-10.png)
+
+Kreator utworzy niezbędny rekord Custom Metadata, aby włączyć funkcjonalność zespołów dla wybranego obiektu.
+
+### Aktywacja/dezaktywacja konfiguracji
+
+Użyj przełącznika obok każdej konfiguracji, aby aktywować lub dezaktywować funkcjonalność zespołów. Dezaktywacja konfiguracji ukryje komponent członków zespołu w rekordach tego obiektu.
+
+![Przełącznik aktywny/nieaktywny](../../../../assets/pictures/install-guide-11.png)
+
+## Krok 3: Dodanie komponentu do stron rekordów
+
+Po skonfigurowaniu obiektu dodaj komponent Team Member do układu strony rekordu.
+
+### Korzystanie z Lightning App Builder
+
+<Steps>
+1. Przejdź do rekordu skonfigurowanego obiektu
+2. Kliknij **ikonę koła zębatego** > **Edit Page**
+
+   ![Przycisk Edit Page](../../../../assets/pictures/install-guide-12.png)
+
+3. W Lightning App Builder znajdź **objectTeamMember** w panelu Components (w sekcji Custom)
+4. Przeciągnij komponent do wybranej lokalizacji na stronie
+
+   ![Przeciąganie komponentu w App Builder](../../../../assets/pictures/install-guide-13.png)
+
+5. Kliknij **Save**
+6. Jeśli zostanie wyświetlony komunikat, **aktywuj** stronę dla odpowiednich użytkowników/profili
+</Steps>
+
+### Zalecenia dotyczące umiejscowienia komponentu
+
+| Lokalizacja | Najlepsze zastosowanie |
+|----------|----------|
+| **Right Sidebar** | Szybki dostęp bez zajmowania głównej przestrzeni treści |
+| **Related Lists Section** | Utrzymuje członków zespołu zgrupowanych z innymi powiązanymi danymi |
+| **New Tab** | Najlepsze dla złożonych scenariuszy zarządzania zespołem |
+
+## Lista weryfikacyjna
+
+Po zakończeniu instalacji zweryfikuj następujące elementy:
+
+- [ ] Ustawienia udostępniania OWD są prawidłowo skonfigurowane dla obiektów docelowych
+- [ ] Użytkownicy Admin mają przypisany Admin Permission Set Group
+- [ ] Użytkownicy końcowi mają przypisany User Permission Set Group
+- [ ] Co najmniej jeden obiekt jest skonfigurowany w Configuration Wizard
+- [ ] Komponent Team Member jest dodany do strony rekordu
+- [ ] Zaplanowane zadanie czyszczenia działa (zobacz [Konfiguracja](/pl/getting-started/configuration/#scheduled-job))

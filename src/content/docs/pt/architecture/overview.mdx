@@ -1,0 +1,231 @@
+---
+title: Visão Geral da Arquitetura
+description: Arquitetura técnica da solução Flexible Team Share.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+Este documento fornece uma descrição técnica detalhada da solução Flexible Team Share, incluindo arquitetura do sistema, fluxo de dados e camadas de processamento.
+
+## Arquitetura do Sistema
+
+```mermaid
+flowchart TB
+    subgraph UI["UI LAYER"]
+        direction LR
+        LWC1["objectTeamMember<br/>Team member list & management"]
+        LWC2["objectTeamMemberWizard<br/>Admin configuration"]
+        LWC3["ftsLabels<br/>Custom labels utility"]
+    end
+
+    subgraph CTRL["CONTROLLER LAYER"]
+        direction LR
+        C1["ObjectTeamMemberController<br/>CRUD operations for team members"]
+        C2["TeamMemberWizardController<br/>Configuration wizard operations"]
+    end
+
+    subgraph DATA["DATA LAYER"]
+        direction LR
+        D1["ObjectTeamMember__c<br/>Team member assignments"]
+        D2["Team_Sharing_Config__c<br/>Per-object sharing config"]
+        D3["FlexiTeamShare_Config__mdt<br/>App configuration"]
+        D4["Triggers:<br/>ObjectTeamMemberTrigger"]
+    end
+
+    subgraph ASYNC["ASYNC PROCESSING LAYER"]
+        direction LR
+        A1["ShareRecordQueueable<br/>Create/update/delete shares"]
+        A2["SharingRecalculationBatch<br/>Bulk recalculation"]
+        A3["ExpiredTeamMemberCleanupBatch<br/>Daily cleanup of expired members"]
+    end
+
+    subgraph SHARE["SALESFORCE SHARING MODEL"]
+        direction LR
+        S1["Standard Share Objects<br/>AccountShare, ContactShare,<br/>CaseShare, LeadShare,<br/>OpportunityShare, etc."]
+        S2["Custom Object Shares<br/>[CustomObject]__Share"]
+        S3["ObjectTeamMember__Share<br/>Team member visibility"]
+    end
+
+    UI --> CTRL
+    CTRL --> DATA
+    DATA --> ASYNC
+    ASYNC --> SHARE
+```
+
+## Camadas
+
+### Camada UI
+
+Três Lightning Web Components:
+
+| Componente | Propósito |
+|-----------|---------|
+| **objectTeamMember** | Exibe membros da equipe em páginas de registro. Suporta adicionar/editar/excluir, lista colapsável e limite de exibição configurável. |
+| **objectTeamMemberWizard** | Interface de administração para configurar objetos, gerenciar configurações e agendar jobs. |
+| **ftsLabels** | Componente utilitário fornecendo custom labels para suporte i18n (35 idiomas). |
+
+### Camada Controller
+
+| Controller | Métodos |
+|-----------|---------|
+| **ObjectTeamMemberController** | `getTeamMembers()`, `addTeamMember()`, `updateTeamMember()`, `removeTeamMember()`, `isCurrentUserManager()`, `isSharingConfigured()`, `getAccessLevelOptions()` |
+| **TeamMemberWizardController** | `getExistingConfigs()`, `getAvailableObjects()`, `createConfig()`, `toggleConfigStatus()`, `deleteConfig()`, `getScheduledJobInfo()`, `scheduleCleanupJob()` |
+| **SyncOwnerInvocable** | `syncOwners()` — Invocable Action para sincronizar membro da equipe Owner quando o owner pai muda. Chamável de Flow ou Apex, totalmente bulkificado. |
+
+### Camada Data
+
+Objetos personalizados e um trigger que dispara em mudanças de membros da equipe:
+
+- **ObjectTeamMember__c** — armazena atribuições de membros da equipe
+- **Team_Sharing_Config__c** — configuração de compartilhamento por objeto
+- **FlexiTeamShare_Config__mdt** — configuração em nível de aplicativo (Custom Metadata)
+- **ObjectTeamMemberTrigger** → **ObjectTeamMemberTriggerHandler** — trata Before Insert, Before Update, Before Delete
+
+### Camada Async Processing
+
+| Componente | Tipo | Propósito |
+|-----------|------|---------|
+| **ShareRecordQueueable** | Queueable | Cria, atualiza e exclui registros de compartilhamento para objetos pai e membros da equipe |
+| **SharingRecalculationBatch** | Batchable | Recalcula em massa todos os compartilhamentos quando a configuração muda |
+| **ExpiredTeamMemberCleanupBatch** | Batchable | Exclui membros da equipe expirados (scheduled job diário) |
+| **ExpiredTeamMemberCleanupScheduler** | Schedulable | Agenda o cleanup batch (executa às 2:00 AM diariamente) |
+
+## Fluxo de Dados: Adicionando um Membro da Equipe
+
+```mermaid
+sequenceDiagram
+    actor User
+    participant LWC as objectTeamMember LWC
+    participant Ctrl as ObjectTeamMemberController
+    participant DB as Database
+    participant Queue as ShareRecordQueueable
+
+    User->>LWC: Click "Add Team Member"
+    LWC->>LWC: Collect input (User, Access Level, Role, End Date)
+    LWC->>Ctrl: addTeamMember(recordId, userId, accessLevel, role, endDate)
+
+    Ctrl->>Ctrl: Check for duplicates
+    Ctrl->>Ctrl: Verify CRUD permissions
+
+    Ctrl->>DB: INSERT ObjectTeamMember__c
+    DB-->>Ctrl: Success
+
+    Note over Ctrl,Queue: Trigger fires after insert
+    Ctrl->>Queue: System.enqueueJob()
+
+    Ctrl-->>LWC: Return success
+    LWC-->>User: Refresh team member list
+
+    Note over Queue: Async processing
+    Queue->>DB: INSERT [Object]Share
+    Queue->>DB: INSERT ObjectTeamMember__Share
+```
+
+## Fluxo de Dados: Sincronização de Mudança de Owner
+
+```mermaid
+sequenceDiagram
+    actor Admin
+    participant Flow as Record-Triggered Flow
+    participant Inv as SyncOwnerInvocable
+    participant DB as Database
+    participant Queue as ShareRecordQueueable
+
+    Note over Admin: Changes record owner
+
+    Admin->>DB: UPDATE Account SET OwnerId = :newOwner
+    DB-->>Flow: Trigger: OwnerId changed
+
+    Flow->>Inv: syncOwners([recordId])
+
+    Inv->>DB: SELECT FROM ObjectTeamMember__c WHERE Role__c = 'Owner'
+    DB-->>Inv: Owner team member
+
+    Inv->>DB: SELECT OwnerId FROM Account
+    DB-->>Inv: New owner ID
+
+    alt Owner changed
+        Inv->>DB: UPDATE ObjectTeamMember__c SET User_Id__c = :newOwner
+        DB-->>Inv: Success
+
+        Inv->>Queue: System.enqueueJob()
+
+        Note over Queue: Async processing
+        Queue->>DB: DELETE old AccountShare (if not member)
+        Queue->>DB: INSERT new AccountShare
+    else Owner unchanged
+        Inv-->>Flow: success=true, "Owner unchanged"
+    end
+
+    Inv-->>Flow: SyncOwnerResult
+```
+
+## Fluxo de Dados: Limpeza de Membros Expirados
+
+```mermaid
+flowchart TB
+    A["Salesforce Scheduler<br/>(2:00 AM daily)"] --> B["ExpiredTeamMemberCleanupScheduler"]
+    B --> C["ExpiredTeamMemberCleanupBatch"]
+    C --> D["Query:<br/>SELECT FROM ObjectTeamMember__c<br/>WHERE End_Date__c < TODAY()"]
+    D --> E["DELETE expired records<br/>(triggers remove shares)"]
+```
+
+## Tratamento de Erros
+
+### Camada Controller
+
+- Todos os métodos públicos envolvidos em try-catch
+- Mensagens de erro amigáveis via Custom Labels
+- `AuraHandledException` para exibição de erro LWC
+
+### Async Processing
+
+- `Database.insert/update/delete(records, false)` — sucesso parcial
+- Erros individuais registrados, não falham o batch inteiro
+- Estatísticas de erro rastreadas em batch jobs
+
+### Camada Trigger
+
+- Padrão de trigger handler previne recursão
+- Erros surgem para o chamador da operação DML
+
+## Considerações de Performance
+
+### Async Processing
+
+- Operações de registro de compartilhamento usam Queueable (não bloqueante)
+- Operações em massa usam Batchable com tamanho de batch configurável
+- Sem DML síncrono em registros de compartilhamento em triggers
+
+### Otimização de Query
+
+- Campos indexados usados em cláusulas WHERE
+- Formato `Record_Id__c` permite queries LIKE eficientes
+- Conjuntos de resultados limitados com cláusulas LIMIT
+
+### Caching
+
+- `@AuraEnabled(cacheable=true)` para operações de leitura
+- Configuração de aplicativo em cache na transação
+
+## Arquitetura de Integração
+
+**Sem integrações externas** — este pacote opera inteiramente dentro do Salesforce:
+
+- Sem HTTP callouts
+- Sem APIs externas
+- Sem Named Credentials
+- Sem External Objects
+- Sem Connected Apps
+
+### Dependências da Plataforma
+
+| Componente | Uso |
+|-----------|-------|
+| Apex Sharing | Cria/gerencia registros de compartilhamento |
+| Queueable Apex | Operações assíncronas de registro de compartilhamento |
+| Batchable Apex | Recálculo em massa de compartilhamento, limpeza |
+| Schedulable Apex | Job de limpeza diário |
+| Custom Metadata | Configuração do aplicativo |
+| Lightning Web Components | Interface do usuário |
+| Custom Labels | Internacionalização |

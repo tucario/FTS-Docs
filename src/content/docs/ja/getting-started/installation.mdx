@@ -1,0 +1,151 @@
+---
+title: インストール
+description: Salesforce組織にFlexible Team Shareをインストールおよびセットアップする方法。
+---
+
+import { Aside, Steps } from '@astrojs/starlight/components';
+
+このガイドでは、Flexible Team Shareをインストールし、Salesforce組織で初期セットアップを完了する手順を説明します。
+
+![Flexible Team Share installed](../../../../assets/pictures/install-guide-1.png)
+
+## 前提条件
+
+### 組織の共有設定（OWD）
+
+Flexible Team Shareを設定する前に、チーム機能を有効にするオブジェクトのOWD共有設定が適切に構成されていることを確認してください。
+
+**必須の共有設定** — Flexible Team Shareが正しく機能するには、オブジェクトのOWDが次のいずれかに設定されている必要があります：
+
+- **Private** — ユーザーは自分のレコードのみ表示可能（推奨）
+- **Public Read Only** — ユーザーはすべてのレコードを表示できるが編集不可
+
+<Aside type="caution">
+OWDが**Public Read/Write**に設定されている場合、ユーザーはすでにすべてのレコードへの完全なアクセス権を持っているため、共有レコードで追加のアクセス権を付与できません。
+</Aside>
+
+### 共有設定を確認/更新する方法
+
+<Steps>
+1. **設定** > **共有設定**に移動
+2. 設定するオブジェクトを見つける
+3. デフォルトアクセスが**Private**または**Public Read Only**に設定されていることを確認
+4. 必要に応じて、**編集**をクリックして設定を変更
+</Steps>
+
+![Sharing Settings in Setup](../../../../assets/pictures/install-guide-3.png)
+
+## AppExchangeからのインストール
+
+![AppExchange installation screen](../../../../assets/pictures/install-guide-2.png)
+
+<Steps>
+1. **「管理者のみにインストール」を選択** — このオプションを強く推奨します。「すべてのユーザー」にインストールすると、全員が管理アプリとConfiguration Wizardに即座にアクセスできるようになります。管理者のみにインストールを制限することで、完全な制御を維持し、後でPermission Setを介して特定のユーザーにアクセス権を付与できます。
+2. **警告を確認** — Salesforce以外のアプリケーションをインストールすることを確認するチェックボックスをオン
+3. **インストールを確認** — **インストール**ボタンをクリックして続行
+</Steps>
+
+## ステップ1: 権限の割り当て
+
+Flexible Team Shareには、異なるアクセスレベルを持つ2つのPermission Set Groupが含まれています：
+
+| Permission Set Group | 説明 |
+|---------------------|-------------|
+| **Flexible Team Share - Admin** | チームメンバーデータへの完全なアクセス + 管理設定アプリへのアクセス |
+| **Flexible Team Share - User** | チームメンバーデータへのアクセスのみ（レコード上のチームメンバーの表示と管理が可能） |
+
+### Permission Set Groupの割り当て
+
+<Steps>
+1. **設定** > **Permission Set Groups**に移動
+2. **Flexible Team Share - Admin**または**Flexible Team Share - User**をクリック
+
+   ![Permission Set Groups list](../../../../assets/pictures/install-guide-4.png)
+
+3. **割り当てを管理** > **割り当てを追加**をクリック
+4. ユーザーを選択し、**次へ** > **割り当て**をクリック
+
+   ![Assigning users to Permission Set Group](../../../../assets/pictures/install-guide-5.png)
+</Steps>
+
+<Aside type="tip">
+アプリケーションを設定するシステム管理者には**Admin** Permission Set Groupを割り当ててください。レコード上でチーム機能を使用するエンドユーザーには**User** Permission Set Groupを割り当ててください。
+</Aside>
+
+![Permission Set Group Assignments](../../../../assets/pictures/permission-set-groups.png)
+
+## ステップ2: オブジェクトの設定
+
+Configuration Wizardを使用して、特定のオブジェクトのチーム機能を有効にします。
+
+### Configuration Wizardを開く
+
+<Steps>
+1. **App Launcher**（9つのドットメニュー）を開く
+2. **Flexible Team Share**を検索して選択
+3. **Configuration**タブに移動
+</Steps>
+
+![Configuration Wizard](../../../../assets/pictures/install-guide-6.png)
+
+### オブジェクト設定を追加
+
+<Steps>
+1. Configuration Wizardで**Add New Configuration**をクリック
+2. 有効にするオブジェクトを選択（例：`Custom_Object__c`または標準オブジェクト）
+3. 設定のラベルを入力
+4. **Deploy**をクリック
+</Steps>
+
+![Add Configuration - Select Object](../../../../assets/pictures/install-guide-7.png)
+![Add Configuration - Label](../../../../assets/pictures/install-guide-8.png)
+![Add Configuration - Deploy](../../../../assets/pictures/install-guide-9.png)
+![Add Configuration - Success](../../../../assets/pictures/install-guide-10.png)
+
+Wizardは、選択したオブジェクトのチーム機能を有効にするために必要なCustom Metadataレコードを作成します。
+
+### 設定の有効化/無効化
+
+各設定の横にあるトグルスイッチを使用して、チーム機能を有効または無効にします。設定を無効にすると、そのオブジェクトのレコードでチームメンバーコンポーネントが非表示になります。
+
+![Active/Inactive toggle](../../../../assets/pictures/install-guide-11.png)
+
+## ステップ3: レコードページにコンポーネントを追加
+
+オブジェクトを設定した後、レコードページレイアウトにチームメンバーコンポーネントを追加します。
+
+### Lightning App Builderを使用
+
+<Steps>
+1. 設定したオブジェクトのレコードに移動
+2. **歯車アイコン** > **ページを編集**をクリック
+
+   ![Edit Page button](../../../../assets/pictures/install-guide-12.png)
+
+3. Lightning App Builderで、コンポーネントパネル（カスタムの下）から**objectTeamMember**を見つける
+4. コンポーネントをページ上の目的の場所にドラッグ
+
+   ![Dragging component in App Builder](../../../../assets/pictures/install-guide-13.png)
+
+5. **保存**をクリック
+6. プロンプトが表示されたら、適切なユーザー/プロファイルに対してページを**有効化**
+</Steps>
+
+### コンポーネントの配置の推奨事項
+
+| 場所 | 最適な用途 |
+|----------|----------|
+| **右サイドバー** | メインコンテンツスペースを使用せずに簡単にアクセス |
+| **関連リストセクション** | チームメンバーを他の関連データとグループ化して表示 |
+| **新しいタブ** | 複雑なチーム管理シナリオに最適 |
+
+## 検証チェックリスト
+
+インストール完了後、以下を確認してください：
+
+- [ ] ターゲットオブジェクトのOWD共有設定が正しく構成されている
+- [ ] 管理ユーザーにAdmin Permission Set Groupが割り当てられている
+- [ ] エンドユーザーにUser Permission Set Groupが割り当てられている
+- [ ] Configuration Wizardで少なくとも1つのオブジェクトが設定されている
+- [ ] レコードページにチームメンバーコンポーネントが追加されている
+- [ ] クリーンアップのScheduled Jobが実行されている（[Configuration](/ja/getting-started/configuration/#scheduled-job)を参照）

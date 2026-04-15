@@ -1,0 +1,77 @@
+---
+title: "v1.0"
+description: Flexible Team Share v1.0 release notes — initial release.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+**Release Date:** February 2026
+
+This is the initial release of Flexible Team Share, a Salesforce managed package that extends native Account Team Member functionality to work with any Salesforce object.
+
+## Features
+
+### Universal Team Membership
+
+Add team members to any Salesforce object — not just Accounts. Create collaborative teams on records across standard and custom objects with automatic record sharing based on team membership.
+
+**Supported standard objects:** Account, Contact, Case, Lead, Opportunity, Campaign, Order
+
+**Custom objects:** Any custom object with Private or Public Read Only OWD is supported.
+
+### Automatic Record Sharing
+
+When a team member is added, share records are automatically created to give the user appropriate access to the parent record. Shares are updated when access levels change and removed when team members are deleted. All sharing operations run asynchronously via Queueable Apex for scalability.
+
+### Role-Based Access Control
+
+Three team member roles with distinct capabilities:
+
+| Role | Description |
+|------|-------------|
+| **Owner** | Automatically assigned to the record owner. Full team management access. |
+| **Manager** | Can add, edit, and remove team members. Delegates team management. |
+| **User** | Can view team members but cannot modify the team. Read/edit access to the record. |
+
+### Temporary Team Assignments
+
+Set an **End Date** on team members for time-limited access. A scheduled batch job runs daily to clean up expired memberships and revoke access automatically.
+
+### Owner Change Synchronization
+
+The `SyncOwnerInvocable` Invocable Action keeps the team Owner in sync when the parent record's owner changes. Callable from Flow or Apex, fully bulkified. Supports all configured objects.
+
+### Configuration Wizard
+
+Admin UI to enable team sharing on a per-object basis. Toggle configurations active/inactive, schedule cleanup jobs, and manage object settings all from one interface.
+
+### Customizable Component
+
+The Object Team Member LWC component is configurable in Lightning App Builder:
+
+- **Card Title** — custom title for the component card
+- **Max Displayed Members** — collapsible list with configurable limit (default: 5)
+
+### Internationalization
+
+35 languages supported via Custom Labels and Translation Workbench.
+
+## Permission Sets
+
+| Permission Set | Audience | Description |
+|---------------|----------|-------------|
+| **FTS_App_Access** | Administrators | Full admin access — app, tabs, all Apex classes, full CRUD + MAR |
+| **FTS_Data_Access** | End Users | User access — basic CRUD on team members, controller Apex classes |
+
+## Requirements
+
+- Salesforce **Enterprise Edition** or higher
+- Objects must have **Private** or **Public Read Only** OWD
+- **Namespace:** `tucariofts`
+- **API Version:** 65.0
+
+## Known Limitations
+
+- Owner sync requires a Record-Triggered Flow per object (managed packages cannot include triggers on standard objects)
+- Queue owners are not supported as team members (uses running user instead)
+- Maximum team member limit is enforced per object configuration

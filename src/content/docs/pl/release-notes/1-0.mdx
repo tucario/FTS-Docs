@@ -1,0 +1,77 @@
+---
+title: "v1.0"
+description: Informacje o wydaniu Flexible Team Share v1.0 — pierwsze wydanie.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+**Data wydania:** luty 2026
+
+To jest pierwsze wydanie Flexible Team Share, pakietu zarządzanego Salesforce, który rozszerza natywną funkcjonalność Account Team Member na dowolny obiekt Salesforce.
+
+## Funkcje
+
+### Uniwersalne członkostwo zespołu
+
+Dodawaj członków zespołu do dowolnego obiektu Salesforce — nie tylko do kont. Twórz zespoły współpracy w rekordach w obiektach standardowych i niestandardowych z automatycznym udostępnianiem rekordów na podstawie członkostwa w zespole.
+
+**Obsługiwane obiekty standardowe:** Account, Contact, Case, Lead, Opportunity, Campaign, Order
+
+**Obiekty niestandardowe:** dowolny obiekt niestandardowy z OWD Private lub Public Read Only jest obsługiwany.
+
+### Automatyczne udostępnianie rekordów
+
+Gdy członek zespołu jest dodawany, rekordy udostępnień są automatycznie tworzone, aby przyznać użytkownikowi odpowiedni dostęp do rekordu nadrzędnego. Udostępnienia są aktualizowane, gdy zmienia się poziom dostępu, i usuwane, gdy członkowie zespołu są usuwani. Wszystkie operacje udostępniania działają asynchronicznie przez Queueable Apex dla skalowalności.
+
+### Kontrola dostępu oparta na rolach
+
+Trzy role członków zespołu z odrębnymi możliwościami:
+
+| Rola | Opis |
+|------|-------------|
+| **Owner** | Automatycznie przypisywana do właściciela rekordu. Pełny dostęp do zarządzania zespołem. |
+| **Manager** | Może dodawać, edytować i usuwać członków zespołu. Deleguje zarządzanie zespołem. |
+| **User** | Może przeglądać członków zespołu, ale nie może modyfikować zespołu. Dostęp do odczytu/edycji rekordu. |
+
+### Tymczasowe przypisania zespołu
+
+Ustaw **datę końcową** dla członków zespołu dla dostępu z ograniczeniem czasowym. Zaplanowane zadanie wsadowe uruchamia się codziennie, aby usunąć wygasłe członkostwa i cofnąć dostęp automatycznie.
+
+### Synchronizacja zmiany właściciela
+
+Invocable Action `SyncOwnerInvocable` synchronizuje właściciela zespołu, gdy zmienia się właściciel rekordu nadrzędnego. Wywoływalna z Flow lub Apex, w pełni zbulkowana. Obsługuje wszystkie skonfigurowane obiekty.
+
+### Configuration Wizard
+
+Interfejs administracyjny do włączania udostępniania zespołowego per obiekt. Przełączaj konfiguracje aktywne/nieaktywne, planuj zadania czyszczenia i zarządzaj ustawieniami obiektów — wszystko z jednego interfejsu.
+
+### Konfigurowalny komponent
+
+Komponent LWC Object Team Member jest konfigurowalny w Lightning App Builder:
+
+- **Card Title** — niestandardowy tytuł dla karty komponentu
+- **Max Displayed Members** — zwijana lista z konfigurowalnym limitem (domyślnie: 5)
+
+### Internacjonalizacja
+
+35 języków obsługiwanych przez Custom Labels i Translation Workbench.
+
+## Permission Sets
+
+| Permission Set | Odbiorcy | Opis |
+|---------------|----------|-------------|
+| **FTS_App_Access** | Administratorzy | Pełny dostęp administratora — aplikacja, zakładki, wszystkie klasy Apex, pełne CRUD + MAR |
+| **FTS_Data_Access** | Użytkownicy końcowi | Dostęp użytkownika — podstawowe CRUD na członkach zespołu, klasy kontrolerów Apex |
+
+## Wymagania
+
+- Salesforce **Enterprise Edition** lub wyższa
+- Obiekty muszą mieć OWD ustawione na **Private** lub **Public Read Only**
+- **Namespace:** `tucariofts`
+- **API Version:** 65.0
+
+## Znane ograniczenia
+
+- Synchronizacja właściciela wymaga Record-Triggered Flow per obiekt (pakiety zarządzane nie mogą zawierać triggerów dla obiektów standardowych)
+- Właściciele w postaci kolejek nie są obsługiwani jako członkowie zespołu (używany jest uruchomiony użytkownik)
+- Egzekwowany jest maksymalny limit członków zespołu per konfiguracja obiektu

@@ -1,0 +1,121 @@
+---
+title: Informe de Escaneo de Seguridad
+description: Resultados de análisis de código estático y mejores prácticas de seguridad.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+## Herramientas de Escaneo Utilizadas
+
+| Herramienta | Versión | Propósito |
+|------|---------|---------|
+| Salesforce Code Analyzer v5 | Latest | Análisis de seguridad Apex/LWC |
+| PMD (incl. AppExchange rules) | v5 | Calidad de código y seguridad |
+| ESLint | v5 | Análisis JavaScript/LWC |
+| RetireJS | v5 | Bibliotecas JS vulnerables |
+| Partner Security Portal (Checkmarx) | Latest | Escaneo de código fuente obligatorio |
+
+## Cómo Generar Informes de Escaneo
+
+### Requisitos Previos
+
+```bash
+# Instalar Salesforce CLI
+npm install -g @salesforce/cli
+
+# Instalar plugin Code Analyzer v5
+sf plugins install @salesforce/plugin-code-analyzer
+```
+
+### Ejecutar Escaneo Completo
+
+```bash
+# Ejecutar todas las reglas con salida HTML
+sf code-analyzer run --workspace force-app --output-file docs/scan-results.html
+
+# Ejecutar reglas específicas de AppExchange
+sf code-analyzer run --rule-selector AppExchange --workspace force-app --output-file docs/scan-appexchange.html
+
+# Ejecutar solo reglas etiquetadas como Security
+sf code-analyzer run --rule-selector Security --workspace force-app --output-file docs/scan-security.html
+
+# Fallar en High o Critical (CI/CD)
+sf code-analyzer run --rule-selector AppExchange --workspace force-app --severity-threshold 2 --output-file docs/scan-appexchange.html
+```
+
+## Mejores Prácticas de Seguridad Implementadas
+
+### Aplicación de CRUD/FLS
+
+- Verificación `isCreateable()` antes de INSERT
+- Verificación `isUpdateable()` antes de UPDATE
+- Verificación `isDeletable()` antes de DELETE
+- Permisos a nivel de campo mediante Permission Sets
+
+### Prevención de Inyección SOQL
+
+- Variables de enlace usadas para entrada de usuario
+- `String.escapeSingleQuotes()` para consultas dinámicas
+- Nombres de objetos derivados de IDs de Salesforce (no entrada de usuario)
+
+### Cumplimiento del Modelo de Uso Compartido
+
+- `with sharing` en controladores principales
+- `without sharing` solo donde está documentado y es necesario
+- Los registros compartidos respetan la configuración OWD
+
+### Seguridad LWC
+
+- Sin `eval()` o ejecución de script dinámico
+- Entrada de usuario sanitizada antes de mostrarse
+- Sin credenciales codificadas
+
+## Seguridad de Integración Externa
+
+| Verificación | Estado | Notas |
+|-------|--------|-------|
+| Llamadas HTTP | N/A | El paquete no realiza llamadas externas |
+| Named Credentials | N/A | No usado |
+| External Objects | N/A | No usado |
+| Remote Site Settings | N/A | No requerido |
+| Violaciones CSP | Aprobado | Sin violaciones de Content-Security-Policy |
+
+## Cobertura de Pruebas Apex
+
+| Clase | Cobertura | Estado |
+|-------|----------|--------|
+| ObjectTeamMemberController | >75% | Aprobado |
+| TeamMemberWizardController | >75% | Aprobado |
+| ShareRecordQueueable | >75% | Aprobado |
+| SharingRecalculationBatch | >75% | Aprobado |
+| ExpiredTeamMemberCleanupBatch | >75% | Aprobado |
+| ObjectTeamMemberTriggerHandler | >75% | Aprobado |
+| PostInstallHandler | >75% | Aprobado |
+| **General** | **>75%** | **Aprobado** |
+
+### Cómo Ejecutar Pruebas con Cobertura
+
+```bash
+# Ejecutar todas las pruebas con cobertura
+sf apex run test --code-coverage --result-format human --target-org [ORG_ALIAS]
+
+# Ejecutar clase de prueba específica
+sf apex run test --tests ObjectTeamMemberTest --code-coverage --result-format human --target-org [ORG_ALIAS]
+```
+
+## Referencia de Comandos del Escáner (Code Analyzer v5)
+
+```bash
+# Listar reglas disponibles
+sf code-analyzer rules
+
+# Listar solo reglas de AppExchange
+sf code-analyzer rules --rule-selector AppExchange
+
+# Ejecutar con selector de reglas específico
+sf code-analyzer run --rule-selector Security --workspace force-app
+
+# Exportar a varios formatos
+sf code-analyzer run --workspace force-app --output-file results.html
+sf code-analyzer run --workspace force-app --output-file results.sarif
+```

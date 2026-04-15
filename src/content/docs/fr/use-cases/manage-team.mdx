@@ -1,0 +1,213 @@
+---
+title: Gérer l'équipe
+description: Cas d'utilisation pour ajouter, modifier, supprimer et voir les membres d'équipe.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+## Cas d'utilisation 2 : Ajouter un membre d'équipe à un enregistrement (Manager)
+
+### Objectif
+
+Ajouter un membre d'équipe à un enregistrement Case avec accès Read/Write.
+
+### Prérequis
+
+- L'utilisateur a le permission set FTS_Data_Access
+- L'objet Case est configuré pour le partage d'équipe
+- L'utilisateur est propriétaire de l'enregistrement OU a le rôle Manager sur l'enregistrement
+
+### Étapes
+
+| Étape | Action | Résultat attendu |
+|------|--------|----------------|
+| 1 | Ouvrir un enregistrement Case | La page de détail du Case se charge |
+| 2 | Localiser le composant "Object Team" | Le composant affiche "No team members" ou la liste existante |
+| 3 | Cliquer sur le bouton "Add" (+) | La fenêtre modale Add Team Member s'ouvre |
+| 4 | Rechercher l'utilisateur "Test User" | L'utilisateur apparaît dans la recherche |
+| 5 | Sélectionner l'utilisateur | L'ID utilisateur est rempli |
+| 6 | Définir Access Level sur "Read/Write" | Le niveau d'accès est sélectionné |
+| 7 | Définir Role sur "User" | Le rôle est sélectionné |
+| 8 | (Optionnel) Définir End Date sur une date future | La date de fin est définie |
+| 9 | Cliquer sur "Add" | La fenêtre modale se ferme, l'utilisateur apparaît dans la liste d'équipe |
+
+![Fenêtre modale Add Team Member](../../../../assets/pictures/add-team-member-modal.png)
+
+### Points de validation
+
+- [ ] La recherche d'utilisateur affiche la photo et l'email
+- [ ] Options de niveau d'accès : Read Only, Read/Write
+- [ ] Options de rôle : Manager, User (Owner non sélectionnable)
+- [ ] La date de fin doit être future (erreur de validation si passée)
+- [ ] Le membre en double affiche un message d'erreur
+- [ ] Enregistrement de partage créé pour Case (vérifier via Setup > Sharing)
+
+---
+
+## Cas d'utilisation 3 : Modifier un membre d'équipe (Manager)
+
+### Objectif
+
+Changer le niveau d'accès d'un membre d'équipe de Read/Write à Read Only.
+
+### Prérequis
+
+- Le membre d'équipe existe sur l'enregistrement
+- L'utilisateur actuel a les permissions de gestionnaire
+
+### Étapes
+
+| Étape | Action | Résultat attendu |
+|------|--------|----------------|
+| 1 | Ouvrir l'enregistrement avec des membres d'équipe | La liste des membres d'équipe est visible |
+| 2 | Cliquer sur l'icône de menu (&#8942;) sur la ligne du membre d'équipe | Le menu déroulant affiche les options Edit/Delete |
+| 3 | Cliquer sur "Edit" | La fenêtre modale de modification s'ouvre avec les valeurs actuelles |
+| 4 | Changer Access Level en "Read Only" | La nouvelle valeur est sélectionnée |
+| 5 | Cliquer sur "Save" | La fenêtre modale se ferme, le niveau d'accès est mis à jour |
+
+![Fenêtre modale Edit Team Member](../../../../assets/pictures/edit-team-member-modal.png)
+
+### Points de validation
+
+- [ ] Les valeurs d'origine sont pré-remplies dans le formulaire de modification
+- [ ] L'utilisateur ne peut pas être changé (lecture seule)
+- [ ] Le niveau d'accès de l'enregistrement de partage est mis à jour en conséquence
+- [ ] Message toast de succès affiché
+
+---
+
+## Cas d'utilisation 4 : Supprimer un membre d'équipe (Manager)
+
+### Objectif
+
+Supprimer un membre d'équipe d'un enregistrement.
+
+### Prérequis
+
+- Le membre d'équipe existe sur l'enregistrement
+- L'utilisateur actuel a les permissions de gestionnaire
+
+### Étapes
+
+| Étape | Action | Résultat attendu |
+|------|--------|----------------|
+| 1 | Ouvrir l'enregistrement avec des membres d'équipe | La liste des membres d'équipe est visible |
+| 2 | Cliquer sur l'icône de menu (&#8942;) sur la ligne du membre d'équipe | Le menu déroulant affiche les options Edit/Delete |
+| 3 | Cliquer sur "Delete" | La fenêtre modale de confirmation s'ouvre |
+| 4 | Cliquer sur "Delete" pour confirmer | La fenêtre modale se ferme, le membre est supprimé de la liste |
+
+![Dialogue de confirmation de suppression](../../../../assets/pictures/delete-confirmation.png)
+
+### Points de validation
+
+- [ ] La confirmation affiche le nom du membre
+- [ ] Enregistrement de partage supprimé pour l'objet parent
+- [ ] Message toast de succès affiché
+- [ ] Le membre n'apparaît plus dans la liste
+
+---
+
+## Cas d'utilisation 5 : Voir l'équipe (utilisateur final)
+
+### Objectif
+
+Voir les membres d'équipe sur un enregistrement où l'utilisateur est membre d'équipe.
+
+### Prérequis
+
+- L'utilisateur a le permission set FTS_Data_Access
+- L'utilisateur est membre d'équipe sur l'enregistrement
+
+### Étapes
+
+| Étape | Action | Résultat attendu |
+|------|--------|----------------|
+| 1 | Ouvrir un enregistrement où l'utilisateur est membre d'équipe | La page de détail de l'enregistrement se charge |
+| 2 | Voir le composant "Object Team" | La liste des membres d'équipe est visible |
+| 3 | Voir sa propre entrée dans la liste | Affiche le nom, la photo, le rôle, le niveau d'accès |
+| 4 | Si plus de 5 membres, cliquer sur "Show X more" | La liste complète s'affiche |
+| 5 | Cliquer sur "Show less" | La liste se réduit à 5 membres |
+
+![Liste de membres d'équipe réduite](../../../../assets/pictures/team-members-collapsed.png)
+
+### Points de validation
+
+- [ ] L'utilisateur peut voir les membres d'équipe
+- [ ] Les boutons Add/Edit/Delete ne sont PAS visibles (sauf si l'utilisateur est Manager)
+- [ ] Le membre avec rôle Owner affiché avec un badge
+- [ ] La date de fin affichée si définie
+- [ ] Si plus de 5 membres, la liste est réduite avec le bouton "Show X more"
+- [ ] Cliquer sur "Show X more" affiche la liste complète
+- [ ] Cliquer sur "Show less" réduit la liste
+- [ ] Le propriétaire de l'enregistrement apparaît toujours en premier dans la liste
+
+---
+
+## Cas d'utilisation 6 : Affectation d'équipe temporaire
+
+### Objectif
+
+Ajouter un membre d'équipe avec une date d'expiration pour un accès temporaire.
+
+### Prérequis
+
+- Permissions de gestionnaire sur l'enregistrement
+- Tâche de nettoyage planifiée (optionnel mais recommandé)
+
+### Étapes
+
+| Étape | Action | Résultat attendu |
+|------|--------|----------------|
+| 1 | Ajouter un membre d'équipe (Cas d'utilisation 2) | Fenêtre modale ouverte |
+| 2 | Définir End Date à 7 jours à partir d'aujourd'hui | Date sélectionnée |
+| 3 | Enregistrer | Membre ajouté avec date de fin affichée |
+| 4 | Attendre que la date de fin passe | — |
+| 5 | La tâche de nettoyage s'exécute (2h00 du matin) | Membre automatiquement supprimé |
+
+![Membre d'équipe avec End Date](../../../../assets/pictures/team-members-end-date.png)
+
+### Points de validation
+
+- [ ] La date de fin affichée dans la liste des membres d'équipe
+- [ ] Date de fin passée non autorisée (erreur de validation)
+- [ ] Les membres expirés sont nettoyés par la tâche batch
+- [ ] Les enregistrements de partage sont supprimés lorsque le membre est supprimé
+
+---
+
+## Cas d'utilisation 10 : Synchronisation du changement de propriétaire
+
+### Objectif
+
+Mettre à jour automatiquement le propriétaire de l'équipe lorsque le propriétaire de l'enregistrement parent change.
+
+### Contexte
+
+Lorsque le champ `OwnerId` d'un enregistrement change (par exemple, un compte est réattribué à un autre commercial), l'enregistrement `ObjectTeamMember__c` avec `Role__c = 'Owner'` doit être mis à jour pour refléter le nouveau propriétaire. Ce n'est pas automatique — cela nécessite un Flow ou un déclencheur Apex.
+
+### Prérequis
+
+- Partage d'équipe configuré pour l'objet
+- Des membres d'équipe existent sur les enregistrements (rôle Owner créé automatiquement)
+- Accès administrateur pour créer des Flows
+
+### Configuration via Flow (recommandé)
+
+Voir le [guide de configuration](/fr/getting-started/configuration/#owner-change-synchronization) pour les instructions de configuration détaillées.
+
+![Flow Builder - Owner Sync Flow](../../../../assets/pictures/flow-builder-owner-sync.png)
+![Action Sync Team Member Owner](../../../../assets/pictures/sync-owner-action-config.png)
+
+### Points de validation
+
+- [ ] Le Flow se déclenche uniquement lorsque OwnerId change
+- [ ] ObjectTeamMember__c avec Role='Owner' mis à jour vers le nouveau propriétaire
+- [ ] Enregistrement de partage de l'ancien propriétaire supprimé (s'il n'est pas encore membre d'équipe)
+- [ ] Enregistrement de partage du nouveau propriétaire créé
+- [ ] Propriétaires de file d'attente gérés (utilise l'utilisateur en cours d'exécution)
+- [ ] Opérations en masse prises en charge (plusieurs enregistrements à la fois)
+
+### Objets pris en charge
+
+- Account, Opportunity, Case, Lead, Campaign, Order
+- Tout objet personnalisé avec partage d'équipe activé

@@ -1,0 +1,60 @@
+---
+title: Use Cases Overview
+description: User personas and testing scenarios for Flexible Team Share.
+slug: 1.0/use-cases/overview
+---
+
+This section describes the main user paths and key features of Flexible Team Share. It serves as a guide for reviewers during application testing.
+
+## User Personas
+
+| Persona | Profile | Permissions |
+|---------|---------|------------|
+| **Admin** | System Administrator | FTS\_App\_Access + FTS\_Data\_Access |
+| **Manager** | Sales Manager / Team Lead | FTS\_Data\_Access |
+| **User** | Standard User | FTS\_Data\_Access |
+
+## Use Case Map
+
+| Category | Use Cases | Persona |
+|----------|-----------|---------|
+| [Initial Setup](/1.0/use-cases/initial-setup/) | Object configuration, component setup, scheduled jobs, display configuration | Admin |
+| [Manage Team](/1.0/use-cases/manage-team/) | Add, edit, remove team members, view team, temporary access, owner sync | Manager, User |
+| [Admin Tasks](/1.0/use-cases/admin-tasks/) | Permission verification, deactivation, manual cleanup | Admin |
+
+## Testing Checklist Summary
+
+### Functional Tests
+
+* \[ ] Add team member (all access levels)
+* \[ ] Edit team member (change access, role, end date)
+* \[ ] Delete team member
+* \[ ] View team members as Manager
+* \[ ] View team members as User (read-only)
+* \[ ] Object configuration (add/edit/delete)
+* \[ ] Scheduled job management
+* \[ ] Manual cleanup execution
+
+### Security Tests
+
+* \[ ] No access without permission set
+* \[ ] Users cannot edit others' teams (unless Manager)
+* \[ ] Share records created with correct access level
+* \[ ] Share records deleted when member removed
+* \[ ] Validation rules enforced (end date)
+
+### UI Configuration Tests
+
+* \[ ] Custom card title displayed correctly
+* \[ ] Display limit (Max Displayed Members) respected
+* \[ ] "Show X more" / "Show less" toggle works
+* \[ ] Limit = 0 shows all members
+* \[ ] Owner always first in collapsed view
+
+### Edge Cases
+
+* \[ ] Duplicate team member rejection
+* \[ ] Past end date rejection
+* \[ ] Maximum limit reached
+* \[ ] Object not configured warning
+* \[ ] User not found in lookup

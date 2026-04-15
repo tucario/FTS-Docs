@@ -1,0 +1,231 @@
+---
+title: Descripción General de Arquitectura
+description: Arquitectura técnica de la solución Flexible Team Share.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+Este documento proporciona una descripción técnica detallada de la solución Flexible Team Share, incluida la arquitectura del sistema, el flujo de datos y las capas de procesamiento.
+
+## Arquitectura del Sistema
+
+```mermaid
+flowchart TB
+    subgraph UI["UI LAYER"]
+        direction LR
+        LWC1["objectTeamMember<br/>Team member list & management"]
+        LWC2["objectTeamMemberWizard<br/>Admin configuration"]
+        LWC3["ftsLabels<br/>Custom labels utility"]
+    end
+
+    subgraph CTRL["CONTROLLER LAYER"]
+        direction LR
+        C1["ObjectTeamMemberController<br/>CRUD operations for team members"]
+        C2["TeamMemberWizardController<br/>Configuration wizard operations"]
+    end
+
+    subgraph DATA["DATA LAYER"]
+        direction LR
+        D1["ObjectTeamMember__c<br/>Team member assignments"]
+        D2["Team_Sharing_Config__c<br/>Per-object sharing config"]
+        D3["FlexiTeamShare_Config__mdt<br/>App configuration"]
+        D4["Triggers:<br/>ObjectTeamMemberTrigger"]
+    end
+
+    subgraph ASYNC["ASYNC PROCESSING LAYER"]
+        direction LR
+        A1["ShareRecordQueueable<br/>Create/update/delete shares"]
+        A2["SharingRecalculationBatch<br/>Bulk recalculation"]
+        A3["ExpiredTeamMemberCleanupBatch<br/>Daily cleanup of expired members"]
+    end
+
+    subgraph SHARE["SALESFORCE SHARING MODEL"]
+        direction LR
+        S1["Standard Share Objects<br/>AccountShare, ContactShare,<br/>CaseShare, LeadShare,<br/>OpportunityShare, etc."]
+        S2["Custom Object Shares<br/>[CustomObject]__Share"]
+        S3["ObjectTeamMember__Share<br/>Team member visibility"]
+    end
+
+    UI --> CTRL
+    CTRL --> DATA
+    DATA --> ASYNC
+    ASYNC --> SHARE
+```
+
+## Capas
+
+### Capa de UI
+
+Tres Lightning Web Components:
+
+| Componente | Propósito |
+|-----------|---------|
+| **objectTeamMember** | Muestra miembros del equipo en páginas de registro. Soporta agregar/editar/eliminar, lista contraíble y límite de visualización configurable. |
+| **objectTeamMemberWizard** | Interfaz de administrador para configurar objetos, gestionar configuraciones y programar trabajos. |
+| **ftsLabels** | Componente de utilidad que proporciona Custom Labels para soporte de i18n (35 idiomas). |
+
+### Capa de Controlador
+
+| Controlador | Métodos |
+|-----------|---------|
+| **ObjectTeamMemberController** | `getTeamMembers()`, `addTeamMember()`, `updateTeamMember()`, `removeTeamMember()`, `isCurrentUserManager()`, `isSharingConfigured()`, `getAccessLevelOptions()` |
+| **TeamMemberWizardController** | `getExistingConfigs()`, `getAvailableObjects()`, `createConfig()`, `toggleConfigStatus()`, `deleteConfig()`, `getScheduledJobInfo()`, `scheduleCleanupJob()` |
+| **SyncOwnerInvocable** | `syncOwners()` — Invocable Action para sincronizar el miembro del equipo Owner cuando cambia el propietario padre. Llamable desde Flow o Apex, completamente bulkificado. |
+
+### Capa de Datos
+
+Objetos personalizados y un trigger que se dispara en cambios de miembros del equipo:
+
+- **ObjectTeamMember__c** — almacena asignaciones de miembros del equipo
+- **Team_Sharing_Config__c** — configuración de uso compartido por objeto
+- **FlexiTeamShare_Config__mdt** — configuración a nivel de aplicación (Custom Metadata)
+- **ObjectTeamMemberTrigger** → **ObjectTeamMemberTriggerHandler** — maneja Before Insert, Before Update, Before Delete
+
+### Capa de Procesamiento Asíncrono
+
+| Componente | Tipo | Propósito |
+|-----------|------|---------|
+| **ShareRecordQueueable** | Queueable | Crea, actualiza y elimina registros compartidos para objetos padre y miembros del equipo |
+| **SharingRecalculationBatch** | Batchable | Recalcula de forma masiva todos los usos compartidos cuando cambia la configuración |
+| **ExpiredTeamMemberCleanupBatch** | Batchable | Elimina miembros del equipo vencidos (trabajo por lotes programado diariamente) |
+| **ExpiredTeamMemberCleanupScheduler** | Schedulable | Programa el lote de limpieza (se ejecuta a las 2:00 AM diariamente) |
+
+## Flujo de Datos: Agregar un Miembro del Equipo
+
+```mermaid
+sequenceDiagram
+    actor User
+    participant LWC as objectTeamMember LWC
+    participant Ctrl as ObjectTeamMemberController
+    participant DB as Database
+    participant Queue as ShareRecordQueueable
+
+    User->>LWC: Click "Add Team Member"
+    LWC->>LWC: Collect input (User, Access Level, Role, End Date)
+    LWC->>Ctrl: addTeamMember(recordId, userId, accessLevel, role, endDate)
+
+    Ctrl->>Ctrl: Check for duplicates
+    Ctrl->>Ctrl: Verify CRUD permissions
+
+    Ctrl->>DB: INSERT ObjectTeamMember__c
+    DB-->>Ctrl: Success
+
+    Note over Ctrl,Queue: Trigger fires after insert
+    Ctrl->>Queue: System.enqueueJob()
+
+    Ctrl-->>LWC: Return success
+    LWC-->>User: Refresh team member list
+
+    Note over Queue: Async processing
+    Queue->>DB: INSERT [Object]Share
+    Queue->>DB: INSERT ObjectTeamMember__Share
+```
+
+## Flujo de Datos: Sincronización de Cambio de Propietario
+
+```mermaid
+sequenceDiagram
+    actor Admin
+    participant Flow as Record-Triggered Flow
+    participant Inv as SyncOwnerInvocable
+    participant DB as Database
+    participant Queue as ShareRecordQueueable
+
+    Note over Admin: Changes record owner
+
+    Admin->>DB: UPDATE Account SET OwnerId = :newOwner
+    DB-->>Flow: Trigger: OwnerId changed
+
+    Flow->>Inv: syncOwners([recordId])
+
+    Inv->>DB: SELECT FROM ObjectTeamMember__c WHERE Role__c = 'Owner'
+    DB-->>Inv: Owner team member
+
+    Inv->>DB: SELECT OwnerId FROM Account
+    DB-->>Inv: New owner ID
+
+    alt Owner changed
+        Inv->>DB: UPDATE ObjectTeamMember__c SET User_Id__c = :newOwner
+        DB-->>Inv: Success
+
+        Inv->>Queue: System.enqueueJob()
+
+        Note over Queue: Async processing
+        Queue->>DB: DELETE old AccountShare (if not member)
+        Queue->>DB: INSERT new AccountShare
+    else Owner unchanged
+        Inv-->>Flow: success=true, "Owner unchanged"
+    end
+
+    Inv-->>Flow: SyncOwnerResult
+```
+
+## Flujo de Datos: Limpieza de Miembros Vencidos
+
+```mermaid
+flowchart TB
+    A["Salesforce Scheduler<br/>(2:00 AM daily)"] --> B["ExpiredTeamMemberCleanupScheduler"]
+    B --> C["ExpiredTeamMemberCleanupBatch"]
+    C --> D["Query:<br/>SELECT FROM ObjectTeamMember__c<br/>WHERE End_Date__c < TODAY()"]
+    D --> E["DELETE expired records<br/>(triggers remove shares)"]
+```
+
+## Manejo de Errores
+
+### Capa de Controlador
+
+- Todos los métodos públicos envueltos en try-catch
+- Mensajes de error amigables mediante Custom Labels
+- `AuraHandledException` para visualización de errores en LWC
+
+### Procesamiento Asíncrono
+
+- `Database.insert/update/delete(records, false)` — éxito parcial
+- Errores individuales registrados, no fallan todo el lote
+- Estadísticas de errores rastreadas en trabajos por lotes
+
+### Capa de Trigger
+
+- El patrón de manejador de trigger previene la recursión
+- Los errores afloran al llamador de la operación DML
+
+## Consideraciones de Rendimiento
+
+### Procesamiento Asíncrono
+
+- Las operaciones de registros compartidos usan Queueable (sin bloqueo)
+- Las operaciones masivas usan Batchable con tamaño de lote configurable
+- Sin DML síncrono en registros compartidos en triggers
+
+### Optimización de Consultas
+
+- Campos indexados usados en cláusulas WHERE
+- El formato `Record_Id__c` permite consultas LIKE eficientes
+- Conjuntos de resultados limitados con cláusulas LIMIT
+
+### Caché
+
+- `@AuraEnabled(cacheable=true)` para operaciones de lectura
+- Configuración de aplicación en caché en la transacción
+
+## Arquitectura de Integración
+
+**Sin integraciones externas** — este paquete opera completamente dentro de Salesforce:
+
+- Sin llamadas HTTP
+- Sin APIs externas
+- Sin Named Credentials
+- Sin External Objects
+- Sin Connected Apps
+
+### Dependencias de Plataforma
+
+| Componente | Uso |
+|-----------|-------|
+| Apex Sharing | Crea/gestiona registros compartidos |
+| Queueable Apex | Operaciones asíncronas de registros compartidos |
+| Batchable Apex | Recálculo masivo de uso compartido, limpieza |
+| Schedulable Apex | Trabajo de limpieza diaria |
+| Custom Metadata | Configuración de aplicación |
+| Lightning Web Components | Interfaz de usuario |
+| Custom Labels | Internacionalización |

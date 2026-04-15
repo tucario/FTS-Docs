@@ -1,0 +1,30 @@
+---
+title: Admin-Aufgaben
+description: Sicherheits- und Verwaltungs-Use-Cases für Flexible Team Share.
+---
+
+## Use Case 8: Zugriff ohne Permission Set
+
+### Ziel
+
+Verhalten überprüfen, wenn Benutzer erforderliche Berechtigungen fehlen.
+
+### Voraussetzungen
+
+- Benutzer OHNE FTS_Data_Access Permission Set
+- Datensatzseite mit Object Team-Komponente
+
+### Schritte
+
+| Schritt | Aktion | Erwartetes Ergebnis |
+|------|--------|----------------|
+| 1 | Datensatzseite öffnen | Seite lädt |
+| 2 | Object Team-Komponente anzeigen | Fehlermeldung angezeigt |
+
+![Access Required-Fehler](../../../../assets/pictures/access-required.png)
+
+### Validierungspunkte
+
+- [ ] Klare Fehlermeldung über fehlenden Zugriff
+- [ ] Keine Daten offengelegt
+- [ ] Keine Systemfehler/Ausnahmen

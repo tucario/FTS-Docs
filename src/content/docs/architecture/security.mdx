@@ -1,0 +1,175 @@
+---
+title: Security
+description: Security mechanisms, permission model, and CRUD/FLS enforcement.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+## Permission Model
+
+### Permission Sets
+
+```mermaid
+flowchart LR
+    subgraph PS["PERMISSION SETS"]
+        subgraph ADMIN["FTS_App_Access<br/>(Administrators)"]
+            A1["App: FlexibleTeamShare"]
+            A2["Tabs: All visible"]
+            A3["Apex: All classes"]
+            A4["Objects: Full CRUD + MAR"]
+            A5["Team_Sharing_Config: CRUD"]
+        end
+
+        subgraph USER["FTS_Data_Access<br/>(End Users)"]
+            U1["ObjectTeamMember__c: CRUD"]
+            U2["Team_Sharing_Config__c: Read"]
+            U3["Apex: Controller only"]
+            U4["No View/Modify All Records"]
+        end
+    end
+```
+
+| Permission Set | Audience | Capabilities |
+|---------------|----------|-------------|
+| **FTS_App_Access** | Administrators | Full app access, all tabs, all Apex classes, full CRUD + Modify All Records on objects, Team_Sharing_Config CRUD |
+| **FTS_Data_Access** | End Users | ObjectTeamMember__c CRUD, Team_Sharing_Config__c Read, controller Apex classes only, no View/Modify All Records |
+
+## Access Control Logic
+
+```mermaid
+flowchart TB
+    START["Who can manage<br/>team members?"] --> CHECK1{"System<br/>Administrator?"}
+    CHECK1 -->|Yes| ALLOWED["ALLOWED"]
+    CHECK1 -->|No| CHECK2{"Record<br/>Owner?"}
+    CHECK2 -->|Yes| ALLOWED
+    CHECK2 -->|No| CHECK3{"Team Member with<br/>Role = Manager<br/>or Owner?"}
+    CHECK3 -->|Yes| ALLOWED
+    CHECK3 -->|No| DENIED["DENIED"]
+```
+
+The `isCurrentUserManager()` method determines who can manage team members:
+
+1. **System Administrators** — always allowed
+2. **Record Owners** — always allowed
+3. **Manager/Owner role team members** — allowed
+4. **Everyone else** — denied
+
+## CRUD/FLS Enforcement
+
+```mermaid
+flowchart LR
+    subgraph CRUD["CRUD/FLS Checks"]
+        C["Create"] --> C1["isCreateable()"]
+        U["Update"] --> U1["isUpdateable() +<br/>isCurrentUserManager()"]
+        D["Delete"] --> D1["isDeletable() +<br/>isCurrentUserManager()"]
+        R["Read"] --> R1["WITH USER_MODE"]
+    end
+
+    subgraph LOC["Execution Mode"]
+        L1["Enforced in Controller"]
+        L2["Elevated Access<br/>(without sharing)"]
+        L3["Respects OWD/Sharing"]
+    end
+
+    C1 --> L1
+    U1 --> L2
+    D1 --> L2
+    R1 --> L3
+```
+
+| Operation | Security Check | Implementation |
+|-----------|---------------|----------------|
+| Create Team Member | `Schema.sObjectType.ObjectTeamMember__c.isCreateable()` | Enforced in controller |
+| Update Team Member | `isUpdateable()` + `isCurrentUserManager()` | Elevated access (without sharing) after authorization |
+| Delete Team Member | `isDeletable()` + `isCurrentUserManager()` | Elevated access (without sharing) after authorization |
+| Read Team Members | `WITH USER_MODE` / sharing model | Respects OWD/sharing |
+
+<Aside type="note">
+Update and Delete operations use elevated access (`without sharing`) to allow managers to modify any team member on the record, not just ones they created. Authorization is always checked first via `isCurrentUserManager()`.
+</Aside>
+
+## Input Validation
+
+| Input | Validation | Location |
+|-------|-----------|----------|
+| `recordId` | Not blank, valid Salesforce ID format | Controller |
+| `userId` | Not blank, valid User ID | Controller |
+| `accessLevel` | Not blank, valid picklist value | Controller + Picklist |
+| `role` | Not blank, valid picklist value | Controller + Picklist |
+| `endDate` | Must be future date or null | Controller + Validation Rule |
+| `objectApiName` | Derived from Salesforce ID (not user input) | Controller |
+
+### Validation Rules
+
+| Rule | Object | Description |
+|------|--------|-------------|
+| `End_Date_Cannot_Be_Past` | `ObjectTeamMember__c` | Prevents setting end date in the past |
+
+## Access Level Mapping
+
+```mermaid
+flowchart LR
+    subgraph INPUT["ObjectTeamMember__c<br/>Access_Level__c"]
+        I1["Read Only"]
+        I2["Read/Write"]
+    end
+
+    subgraph OUTPUT["[Object]Share<br/>AccessLevel"]
+        O1["Read"]
+        O2["Edit"]
+    end
+
+    I1 --> O1
+    I2 --> O2
+```
+
+## Complete Security Overview
+
+```mermaid
+flowchart TB
+    subgraph PERM["Permission Sets"]
+        PS1["FTS_App_Access<br/>Administrators"]
+        PS2["FTS_Data_Access<br/>End Users"]
+    end
+
+    subgraph ACCESS["Access Control"]
+        AC1["System Admin"]
+        AC2["Record Owner"]
+        AC3["Manager/Owner Role"]
+    end
+
+    subgraph SHARE["Sharing Model"]
+        SH1["ObjectTeamMember__Share"]
+        SH2["[Object]Share"]
+    end
+
+    subgraph LEVELS["Access Levels"]
+        LV1["Read Only → Read"]
+        LV2["Read/Write → Edit"]
+    end
+
+    PERM --> ACCESS
+    ACCESS --> SHARE
+    SHARE --> LEVELS
+```
+
+## Security Best Practices Implemented
+
+| Control | Status | Implementation |
+|---------|--------|---------------|
+| CRUD checks in controllers | Implemented | `isAccessible()`, `isCreateable()`, `isUpdateable()`, `isDeletable()` |
+| FLS enforcement | Implemented | Permission Sets control field access |
+| SOQL injection prevention | Implemented | Bind variables for user input, whitelist for object names |
+| Sharing model | Implemented | `with sharing` on controllers, `without sharing` only where documented |
+| Input validation | Implemented | Null checks, format validation, business rules |
+| XSS prevention | Implemented | LWC framework handles output encoding |
+
+## External Integration Security
+
+| Check | Result |
+|-------|--------|
+| HTTP Callouts | None — package makes no external calls |
+| Named Credentials | Not used |
+| External Objects | Not used |
+| Remote Site Settings | Not required |
+| CSP Violations | Pass — no Content-Security-Policy violations |

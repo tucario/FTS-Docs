@@ -1,0 +1,215 @@
+---
+title: AppExchange Release
+description: Step-by-step guide for building, scanning, and submitting the
+  package to AppExchange.
+slug: 1.0/internal/appexchange
+---
+
+import { Aside, Steps } from '@astrojs/starlight/components';
+
+## Phase 1: Pre-flight (local)
+
+Run these before touching the org. Fix everything that comes up.
+
+### 1.1 Salesforce Code Analyzer v5 — full scan
+
+```bash
+# Install (once)
+sf plugins install @salesforce/plugin-code-analyzer
+
+# Run ALL rules (PMD, ESLint, RetireJS, Regex, Flow, CPD)
+sf code-analyzer run \
+  --workspace force-app \
+  --output-file docs/scan-results.html
+
+# Run AppExchange-specific rules
+sf code-analyzer run \
+  --rule-selector AppExchange \
+  --workspace force-app \
+  --output-file docs/scan-appexchange.html
+
+# Run only Security-tagged rules
+sf code-analyzer run \
+  --rule-selector Security \
+  --workspace force-app \
+  --output-file docs/scan-security.html
+
+# Severity threshold — fail on High or Critical (CI/CD)
+sf code-analyzer run \
+  --rule-selector AppExchange \
+  --workspace force-app \
+  --severity-threshold 2 \
+  --output-file docs/scan-appexchange.html
+```
+
+**Zero tolerance on**: Critical (1) and High (2).
+Medium (3) and below — document as false positives in `docs/FALSE-POSITIVES.md`.
+
+### 1.2 ESLint (LWC)
+
+```bash
+npm run lint
+```
+
+### 1.3 LWC Jest tests
+
+```bash
+npm run test:unit
+```
+
+## Phase 2: Org Tests & Coverage
+
+### 2.1 Run all Apex tests
+
+```bash
+sf apex run test \
+  --code-coverage \
+  --result-format human \
+  --wait 10 \
+  --target-org FlexiFREE
+```
+
+**Required**: >= 75% overall coverage, every trigger must have coverage.
+
+### 2.2 Check per-class coverage
+
+```bash
+sf apex run test \
+  --code-coverage \
+  --result-format json \
+  --wait 10 \
+  --target-org FlexiFREE \
+  | jq '.result.coverage.coverage[]
+        | select(.coveredPercent < 75)
+        | {name, coveredPercent}'
+```
+
+## Phase 3: Build Package Version (beta)
+
+### 3.1 Bump version in sfdx-project.json
+
+```json
+"versionName": "ver 1.2.0",
+"versionNumber": "1.2.0.NEXT"
+```
+
+### 3.2 Create beta package version
+
+```bash
+sf package version create \
+  --package FlexibleTeamShare \
+  --definition-file config/package-scratch-def.json \
+  --installation-key-bypass \
+  --wait 30 \
+  --code-coverage \
+  --skip-ancestor-check
+```
+
+### 3.3 Verify and check coverage
+
+```bash
+sf package version list --packages FlexibleTeamShare --order-by CreatedDate --verbose
+sf package version report --package 04tXXXXXXXXXXXXXXX --verbose
+```
+
+## Phase 4: Test Install
+
+### 4.1 Install in a clean scratch/sandbox org
+
+```bash
+sf package install \
+  --package 04tXXXXXXXXXXXXXXX \
+  --target-org TestOrg \
+  --wait 10
+```
+
+### 4.2 Smoke test
+
+* Assign `FTS_App_Access` and `FTS_Data_Access` permission sets
+* Configure a sharing config via the Wizard
+* Add/edit/remove team members on a record
+* Verify sharing records created/deleted
+* Test as non-admin user (FTS\_Data\_Access only)
+
+## Phase 5: Promote to Release
+
+<Aside type="caution">
+  This is **irreversible** — promoted versions cannot be deleted.
+</Aside>
+
+```bash
+sf package version promote --package 04tXXXXXXXXXXXXXXX
+```
+
+## Phase 6: Partner Security Portal — Source Scanner (Checkmarx)
+
+This is **mandatory** for any submission that includes a Salesforce package.
+
+<Steps>
+  1. Go to [Partner Security Portal](https://security.my.salesforce-sites.com/sourcescanner) using your DevHub/packaging org credentials
+  2. Select your **promoted** (released) package version
+  3. Click **Start Scan** and wait for results (usually 15-30 min)
+  4. Download the report
+</Steps>
+
+<Aside type="tip">
+  You get **3 free scans per review**. Don't waste them on beta versions.
+</Aside>
+
+### Handle findings
+
+* **Critical/High** — fix the code, rebuild, rescan
+* **False positives** — document in `docs/FALSE-POSITIVES.md`, attach to submission
+* **Low/Info** — document rationale, no fix required
+
+## Phase 7: DAST Scan (if applicable)
+
+Flexible Team Share has **no external callouts, no web UI, no API endpoints** — DAST is **not applicable**.
+
+## Phase 8: Prepare Submission Materials
+
+### Required documents
+
+| Material | File | Notes |
+|----------|------|-------|
+| Code Analyzer report (full) | `docs/scan-results.html` | From Phase 1 |
+| Code Analyzer report (AppExchange) | `docs/scan-appexchange.html` | From Phase 1 |
+| Source Scanner report | Downloaded from Portal | From Phase 6 |
+| False positives doc | `docs/FALSE-POSITIVES.md` | Explain each finding |
+| Admin/User documentation | `docs/APPLICATION-OVERVIEW.md`, `docs/USE-CASES.md` | Reviewers test your app |
+| Installation guide | `docs/1. Installation Guide.md` | Step-by-step setup |
+
+### Review org preparation
+
+* Install the **promoted** package version
+* **Disable MFA/2FA** so the review team can log in
+* Only install packages related to this review
+* Create a test user with full access for the review team
+* Pre-configure at least one working sharing config with sample data
+
+## Phase 9: Submit
+
+<Steps>
+  1. Go to **AppExchange Partner Console** > Publishing > Security Review
+  2. Select your package and promoted version
+  3. Upload all scan reports
+  4. Provide org login credentials for the review team
+  5. Pay $999 fee (for paid apps; free apps — no fee)
+  6. Submit
+</Steps>
+
+**Timeline**: 4-6 weeks. Most apps pass on 2nd attempt.
+
+## Execution Order Summary
+
+```
+Phase 1  Code Analyzer + ESLint + Jest     ← fix code issues
+Phase 2  Apex tests in org (>= 75%)        ← fix coverage gaps
+Phase 3  Build beta package version        ← if build fails, back to Phase 2
+Phase 4  Install & smoke test in clean org ← if broken, fix and rebuild
+Phase 5  Promote to release                ← IRREVERSIBLE
+Phase 6  Source Scanner (Checkmarx)        ← only on promoted version
+Phase 7  DAST scan (if applicable)         ← N/A for this app
+Phase 8  Prepare docs & review org         ← package everything
+Phase 9  Submit to AppExchange             ← wait 4-6 weeks
+```

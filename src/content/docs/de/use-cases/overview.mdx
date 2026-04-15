@@ -1,0 +1,59 @@
+---
+title: Use Cases-Übersicht
+description: Benutzerpersonas und Testszenarien für Flexible Team Share.
+---
+
+Dieser Abschnitt beschreibt die Hauptbenutzerpfade und wichtigsten Funktionen von Flexible Team Share. Er dient als Leitfaden für Reviewer während des Anwendungstests.
+
+## Benutzerpersonas
+
+| Persona | Profil | Berechtigungen |
+|---------|---------|------------|
+| **Admin** | System Administrator | FTS_App_Access + FTS_Data_Access |
+| **Manager** | Sales Manager / Team Lead | FTS_Data_Access |
+| **User** | Standard User | FTS_Data_Access |
+
+## Use Case-Übersicht
+
+| Kategorie | Use Cases | Persona |
+|----------|-----------|---------|
+| [Ersteinrichtung](/de/use-cases/initial-setup/) | Objektkonfiguration, Komponenten-Setup, geplante Jobs, Anzeigekonfiguration | Admin |
+| [Team verwalten](/de/use-cases/manage-team/) | Teammitglieder hinzufügen, bearbeiten, entfernen, Team anzeigen, temporärer Zugriff, Owner-Synchronisierung | Manager, User |
+| [Admin-Aufgaben](/de/use-cases/admin-tasks/) | Berechtigungsüberprüfung, Deaktivierung, manuelle Bereinigung | Admin |
+
+## Testzusammenfassung
+
+### Funktionstests
+
+- [ ] Teammitglied hinzufügen (alle Zugriffsebenen)
+- [ ] Teammitglied bearbeiten (Zugriff, Rolle, Enddatum ändern)
+- [ ] Teammitglied löschen
+- [ ] Teammitglieder als Manager anzeigen
+- [ ] Teammitglieder als User anzeigen (schreibgeschützt)
+- [ ] Objektkonfiguration (hinzufügen/bearbeiten/löschen)
+- [ ] Scheduled-Job-Verwaltung
+- [ ] Manuelle Bereinigung ausführen
+
+### Sicherheitstests
+
+- [ ] Kein Zugriff ohne Permission Set
+- [ ] Benutzer können nicht die Teams anderer bearbeiten (außer Manager)
+- [ ] Freigabedatensätze mit korrekter Zugriffsebene erstellt
+- [ ] Freigabedatensätze gelöscht, wenn Mitglied entfernt wird
+- [ ] Validation Rules durchgesetzt (Enddatum)
+
+### UI-Konfigurationstests
+
+- [ ] Benutzerdefinierter Card-Titel wird korrekt angezeigt
+- [ ] Anzeigelimit (Max Displayed Members) eingehalten
+- [ ] "Show X more" / "Show less"-Umschalter funktioniert
+- [ ] Limit = 0 zeigt alle Mitglieder
+- [ ] Owner immer zuerst in eingeklappter Ansicht
+
+### Grenzfälle
+
+- [ ] Ablehnung doppelter Teammitglieder
+- [ ] Ablehnung vergangener Enddaten
+- [ ] Maximallimit erreicht
+- [ ] Warnung "Objekt nicht konfiguriert"
+- [ ] Benutzer in Suche nicht gefunden

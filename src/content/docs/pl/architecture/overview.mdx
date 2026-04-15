@@ -1,0 +1,231 @@
+---
+title: Przegląd architektury
+description: Architektura techniczna rozwiązania Flexible Team Share.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+Niniejszy dokument zawiera szczegółowy opis techniczny rozwiązania Flexible Team Share, w tym architekturę systemu, przepływ danych i warstwy przetwarzania.
+
+## Architektura systemu
+
+```mermaid
+flowchart TB
+    subgraph UI["UI LAYER"]
+        direction LR
+        LWC1["objectTeamMember<br/>Lista członków zespołu i zarządzanie"]
+        LWC2["objectTeamMemberWizard<br/>Konfiguracja admin"]
+        LWC3["ftsLabels<br/>Narzędzie Custom Labels"]
+    end
+
+    subgraph CTRL["CONTROLLER LAYER"]
+        direction LR
+        C1["ObjectTeamMemberController<br/>Operacje CRUD dla członków zespołu"]
+        C2["TeamMemberWizardController<br/>Operacje kreatora konfiguracji"]
+    end
+
+    subgraph DATA["DATA LAYER"]
+        direction LR
+        D1["ObjectTeamMember__c<br/>Przypisania członków zespołu"]
+        D2["Team_Sharing_Config__c<br/>Konfiguracja udostępniania per obiekt"]
+        D3["FlexiTeamShare_Config__mdt<br/>Konfiguracja aplikacji"]
+        D4["Triggers:<br/>ObjectTeamMemberTrigger"]
+    end
+
+    subgraph ASYNC["ASYNC PROCESSING LAYER"]
+        direction LR
+        A1["ShareRecordQueueable<br/>Tworzenie/aktualizacja/usuwanie udostępnień"]
+        A2["SharingRecalculationBatch<br/>Hurtowa rekalkulacja"]
+        A3["ExpiredTeamMemberCleanupBatch<br/>Codzienne czyszczenie wygasłych członków"]
+    end
+
+    subgraph SHARE["SALESFORCE SHARING MODEL"]
+        direction LR
+        S1["Standard Share Objects<br/>AccountShare, ContactShare,<br/>CaseShare, LeadShare,<br/>OpportunityShare, itd."]
+        S2["Custom Object Shares<br/>[CustomObject]__Share"]
+        S3["ObjectTeamMember__Share<br/>Widoczność członków zespołu"]
+    end
+
+    UI --> CTRL
+    CTRL --> DATA
+    DATA --> ASYNC
+    ASYNC --> SHARE
+```
+
+## Warstwy
+
+### Warstwa UI
+
+Trzy Lightning Web Components:
+
+| Komponent | Przeznaczenie |
+|-----------|---------|
+| **objectTeamMember** | Wyświetla członków zespołu na stronach rekordów. Obsługuje dodawanie/edycję/usuwanie, zwijanie listy i konfigurowalny limit wyświetlania. |
+| **objectTeamMemberWizard** | Interfejs administracyjny do konfiguracji obiektów, zarządzania ustawieniami i planowania zadań. |
+| **ftsLabels** | Komponent narzędziowy zapewniający Custom Labels dla obsługi i18n (35 języków). |
+
+### Warstwa kontrolera
+
+| Kontroler | Metody |
+|-----------|---------|
+| **ObjectTeamMemberController** | `getTeamMembers()`, `addTeamMember()`, `updateTeamMember()`, `removeTeamMember()`, `isCurrentUserManager()`, `isSharingConfigured()`, `getAccessLevelOptions()` |
+| **TeamMemberWizardController** | `getExistingConfigs()`, `getAvailableObjects()`, `createConfig()`, `toggleConfigStatus()`, `deleteConfig()`, `getScheduledJobInfo()`, `scheduleCleanupJob()` |
+| **SyncOwnerInvocable** | `syncOwners()` — Invocable Action do synchronizacji członka zespołu Owner, gdy zmienia się właściciel nadrzędny. Wywoływalna z Flow lub Apex, w pełni zbulkowana. |
+
+### Warstwa danych
+
+Obiekty niestandardowe i trigger wyzwalany przy zmianach członków zespołu:
+
+- **ObjectTeamMember__c** — przechowuje przypisania członków zespołu
+- **Team_Sharing_Config__c** — konfiguracja udostępniania per obiekt
+- **FlexiTeamShare_Config__mdt** — konfiguracja na poziomie aplikacji (Custom Metadata)
+- **ObjectTeamMemberTrigger** → **ObjectTeamMemberTriggerHandler** — obsługuje Before Insert, Before Update, Before Delete
+
+### Warstwa przetwarzania asynchronicznego
+
+| Komponent | Typ | Przeznaczenie |
+|-----------|------|---------|
+| **ShareRecordQueueable** | Queueable | Tworzy, aktualizuje i usuwa rekordy udostępnień dla obiektów nadrzędnych i członków zespołu |
+| **SharingRecalculationBatch** | Batchable | Hurtowa rekalkulacja wszystkich udostępnień przy zmianie konfiguracji |
+| **ExpiredTeamMemberCleanupBatch** | Batchable | Usuwa wygasłych członków zespołu (codzienne zaplanowane zadanie) |
+| **ExpiredTeamMemberCleanupScheduler** | Schedulable | Planuje zadanie czyszczenia (uruchamia się codziennie o 2:00) |
+
+## Przepływ danych: dodawanie członka zespołu
+
+```mermaid
+sequenceDiagram
+    actor User
+    participant LWC as objectTeamMember LWC
+    participant Ctrl as ObjectTeamMemberController
+    participant DB as Database
+    participant Queue as ShareRecordQueueable
+
+    User->>LWC: Kliknij "Add Team Member"
+    LWC->>LWC: Zbierz dane wejściowe (User, Access Level, Role, End Date)
+    LWC->>Ctrl: addTeamMember(recordId, userId, accessLevel, role, endDate)
+
+    Ctrl->>Ctrl: Sprawdź duplikaty
+    Ctrl->>Ctrl: Zweryfikuj uprawnienia CRUD
+
+    Ctrl->>DB: INSERT ObjectTeamMember__c
+    DB-->>Ctrl: Sukces
+
+    Note over Ctrl,Queue: Trigger wyzwala się po insert
+    Ctrl->>Queue: System.enqueueJob()
+
+    Ctrl-->>LWC: Zwróć sukces
+    LWC-->>User: Odśwież listę członków zespołu
+
+    Note over Queue: Przetwarzanie asynchroniczne
+    Queue->>DB: INSERT [Object]Share
+    Queue->>DB: INSERT ObjectTeamMember__Share
+```
+
+## Przepływ danych: synchronizacja zmiany właściciela
+
+```mermaid
+sequenceDiagram
+    actor Admin
+    participant Flow as Record-Triggered Flow
+    participant Inv as SyncOwnerInvocable
+    participant DB as Database
+    participant Queue as ShareRecordQueueable
+
+    Note over Admin: Zmienia właściciela rekordu
+
+    Admin->>DB: UPDATE Account SET OwnerId = :newOwner
+    DB-->>Flow: Trigger: OwnerId zmieniony
+
+    Flow->>Inv: syncOwners([recordId])
+
+    Inv->>DB: SELECT FROM ObjectTeamMember__c WHERE Role__c = 'Owner'
+    DB-->>Inv: Członek zespołu Owner
+
+    Inv->>DB: SELECT OwnerId FROM Account
+    DB-->>Inv: Nowy owner ID
+
+    alt Właściciel zmieniony
+        Inv->>DB: UPDATE ObjectTeamMember__c SET User_Id__c = :newOwner
+        DB-->>Inv: Sukces
+
+        Inv->>Queue: System.enqueueJob()
+
+        Note over Queue: Przetwarzanie asynchroniczne
+        Queue->>DB: DELETE stary AccountShare (jeśli nie jest członkiem)
+        Queue->>DB: INSERT nowy AccountShare
+    else Właściciel bez zmian
+        Inv-->>Flow: success=true, "Owner unchanged"
+    end
+
+    Inv-->>Flow: SyncOwnerResult
+```
+
+## Przepływ danych: czyszczenie wygasłych członków
+
+```mermaid
+flowchart TB
+    A["Salesforce Scheduler<br/>(2:00 codziennie)"] --> B["ExpiredTeamMemberCleanupScheduler"]
+    B --> C["ExpiredTeamMemberCleanupBatch"]
+    C --> D["Query:<br/>SELECT FROM ObjectTeamMember__c<br/>WHERE End_Date__c < TODAY()"]
+    D --> E["DELETE wygasłe rekordy<br/>(triggery usuwają udostępnienia)"]
+```
+
+## Obsługa błędów
+
+### Warstwa kontrolera
+
+- Wszystkie metody publiczne opakowane w try-catch
+- Przyjazne użytkownikowi komunikaty błędów za pomocą Custom Labels
+- `AuraHandledException` dla wyświetlania błędów LWC
+
+### Przetwarzanie asynchroniczne
+
+- `Database.insert/update/delete(records, false)` — częściowy sukces
+- Indywidualne błędy logowane, nie powodują niepowodzenia całej partii
+- Statystyki błędów śledzone w zadaniach wsadowych
+
+### Warstwa triggera
+
+- Wzorzec trigger handler zapobiega rekurencji
+- Błędy przekazywane do wywołującego operację DML
+
+## Zagadnienia wydajnościowe
+
+### Przetwarzanie asynchroniczne
+
+- Operacje na rekordach udostępnień wykorzystują Queueable (nieblokujące)
+- Operacje hurtowe wykorzystują Batchable z konfigurowalnym rozmiarem partii
+- Brak synchronicznych operacji DML na rekordach udostępnień w triggerach
+
+### Optymalizacja zapytań
+
+- Pola indeksowane używane w klauzulach WHERE
+- Format `Record_Id__c` umożliwia efektywne zapytania LIKE
+- Ograniczone zestawy wyników za pomocą klauzul LIMIT
+
+### Cachowanie
+
+- `@AuraEnabled(cacheable=true)` dla operacji odczytu
+- Konfiguracja aplikacji cachowana w transakcji
+
+## Architektura integracji
+
+**Brak integracji zewnętrznych** — ten pakiet działa w całości w ramach Salesforce:
+
+- Brak wywołań HTTP
+- Brak zewnętrznych API
+- Brak Named Credentials
+- Brak External Objects
+- Brak Connected Apps
+
+### Zależności platformowe
+
+| Komponent | Użycie |
+|-----------|-------|
+| Apex Sharing | Tworzy/zarządza rekordami udostępnień |
+| Queueable Apex | Asynchroniczne operacje na rekordach udostępnień |
+| Batchable Apex | Hurtowa rekalkulacja udostępnień, czyszczenie |
+| Schedulable Apex | Codzienne zadanie czyszczenia |
+| Custom Metadata | Konfiguracja aplikacji |
+| Lightning Web Components | Interfejs użytkownika |
+| Custom Labels | Internacjonalizacja |

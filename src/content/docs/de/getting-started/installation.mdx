@@ -1,0 +1,151 @@
+---
+title: Installation
+description: So installieren und richten Sie Flexible Team Share in Ihrer Salesforce-Org ein.
+---
+
+import { Aside, Steps } from '@astrojs/starlight/components';
+
+Dieser Leitfaden führt Sie durch die Installation von Flexible Team Share und die Erstkonfiguration in Ihrer Salesforce-Org.
+
+![Flexible Team Share installiert](../../../../assets/pictures/install-guide-1.png)
+
+## Voraussetzungen
+
+### Organization-Wide Defaults
+
+Bevor Sie Flexible Team Share konfigurieren, stellen Sie sicher, dass die OWD-Freigabeeinstellungen für die Objekte, für die Sie die Team-Funktionalität aktivieren möchten, ordnungsgemäß konfiguriert sind.
+
+**Erforderliche Freigabeeinstellungen** — damit Flexible Team Share ordnungsgemäß funktioniert, muss das OWD des Objekts auf einen der folgenden Werte gesetzt sein:
+
+- **Private** — Benutzer können nur ihre eigenen Datensätze sehen (empfohlen)
+- **Public Read Only** — Benutzer können alle Datensätze sehen, aber nicht bearbeiten
+
+<Aside type="caution">
+Wenn das OWD auf **Public Read/Write** gesetzt ist, können Freigabedatensätze keinen zusätzlichen Zugriff gewähren, da Benutzer bereits vollen Zugriff auf alle Datensätze haben.
+</Aside>
+
+### Freigabeeinstellungen überprüfen/aktualisieren
+
+<Steps>
+1. Gehen Sie zu **Setup** > **Sharing Settings**
+2. Suchen Sie das Objekt, das Sie konfigurieren möchten
+3. Überprüfen Sie, dass der Default Access auf **Private** oder **Public Read Only** gesetzt ist
+4. Falls erforderlich, klicken Sie auf **Edit**, um die Einstellungen zu ändern
+</Steps>
+
+![Sharing Settings in Setup](../../../../assets/pictures/install-guide-3.png)
+
+## Installation aus AppExchange
+
+![AppExchange-Installationsbildschirm](../../../../assets/pictures/install-guide-2.png)
+
+<Steps>
+1. **Wählen Sie "Install for Admins Only"** — Wir empfehlen diese Option dringend. Die Installation für "All Users" würde allen sofortigen Zugriff auf die Admin-App und den Configuration Wizard gewähren. Indem Sie die Installation auf Admins beschränken, behalten Sie die volle Kontrolle und können später über Permission Sets bestimmten Benutzern Zugriff gewähren.
+2. **Bestätigen Sie die Warnung** — Aktivieren Sie das Kontrollkästchen, um zu bestätigen, dass Sie eine Nicht-Salesforce-Anwendung installieren.
+3. **Bestätigen Sie die Installation** — Klicken Sie auf die Schaltfläche **Install**, um fortzufahren.
+</Steps>
+
+## Schritt 1: Berechtigungen zuweisen
+
+Flexible Team Share enthält zwei Permission Set Groups mit unterschiedlichen Zugriffsebenen:
+
+| Permission Set Group | Beschreibung |
+|---------------------|-------------|
+| **Flexible Team Share - Admin** | Vollzugriff auf Teammitgliederdaten + Zugriff auf die Admin-Konfigurations-App |
+| **Flexible Team Share - User** | Zugriff nur auf Teammitgliederdaten (kann Teammitglieder in Datensätzen anzeigen und verwalten) |
+
+### Permission Set Groups zuweisen
+
+<Steps>
+1. Gehen Sie zu **Setup** > **Permission Set Groups**
+2. Klicken Sie auf **Flexible Team Share - Admin** oder **Flexible Team Share - User**
+
+   ![Permission Set Groups-Liste](../../../../assets/pictures/install-guide-4.png)
+
+3. Klicken Sie auf **Manage Assignments** > **Add Assignments**
+4. Wählen Sie die Benutzer aus und klicken Sie auf **Next** > **Assign**
+
+   ![Benutzer zu Permission Set Group zuweisen](../../../../assets/pictures/install-guide-5.png)
+</Steps>
+
+<Aside type="tip">
+Weisen Sie die **Admin** Permission Set Group Systemadministratoren zu, die die Anwendung konfigurieren werden. Weisen Sie die **User** Permission Set Group Endbenutzern zu, die die Team-Funktionalität bei Datensätzen verwenden werden.
+</Aside>
+
+![Permission Set Group Assignments](../../../../assets/pictures/permission-set-groups.png)
+
+## Schritt 2: Objekte konfigurieren
+
+Verwenden Sie den Configuration Wizard, um die Team-Funktionalität für bestimmte Objekte zu aktivieren.
+
+### Configuration Wizard öffnen
+
+<Steps>
+1. Öffnen Sie den **App Launcher** (9-Punkte-Menü)
+2. Suchen Sie nach **Flexible Team Share** und wählen Sie es aus
+3. Navigieren Sie zur Registerkarte **Configuration**
+</Steps>
+
+![Configuration Wizard](../../../../assets/pictures/install-guide-6.png)
+
+### Objektkonfiguration hinzufügen
+
+<Steps>
+1. Klicken Sie im Configuration Wizard auf **Add New Configuration**
+2. Wählen Sie das Objekt aus, das Sie aktivieren möchten (z. B. `Custom_Object__c` oder ein Standardobjekt)
+3. Geben Sie eine Bezeichnung für die Konfiguration ein
+4. Klicken Sie auf **Deploy**
+</Steps>
+
+![Add Configuration - Select Object](../../../../assets/pictures/install-guide-7.png)
+![Add Configuration - Label](../../../../assets/pictures/install-guide-8.png)
+![Add Configuration - Deploy](../../../../assets/pictures/install-guide-9.png)
+![Add Configuration - Success](../../../../assets/pictures/install-guide-10.png)
+
+Der Wizard erstellt den erforderlichen Custom Metadata-Datensatz, um die Team-Funktionalität für das ausgewählte Objekt zu aktivieren.
+
+### Konfigurationen aktivieren/deaktivieren
+
+Verwenden Sie den Umschalter neben jeder Konfiguration, um die Team-Funktionalität zu aktivieren oder zu deaktivieren. Das Deaktivieren einer Konfiguration blendet die Team Member-Komponente in den Datensätzen dieses Objekts aus.
+
+![Active/Inactive toggle](../../../../assets/pictures/install-guide-11.png)
+
+## Schritt 3: Komponente zu Datensatzseiten hinzufügen
+
+Nach der Konfiguration eines Objekts fügen Sie die Team Member-Komponente zum Layout der Datensatzseite hinzu.
+
+### Verwendung des Lightning App Builder
+
+<Steps>
+1. Navigieren Sie zu einem Datensatz des konfigurierten Objekts
+2. Klicken Sie auf das **Zahnradsymbol** > **Edit Page**
+
+   ![Edit Page-Button](../../../../assets/pictures/install-guide-12.png)
+
+3. Suchen Sie im Lightning App Builder **objectTeamMember** im Komponenten-Panel (unter Custom)
+4. Ziehen Sie die Komponente an die gewünschte Position auf der Seite
+
+   ![Komponente im App Builder ziehen](../../../../assets/pictures/install-guide-13.png)
+
+5. Klicken Sie auf **Save**
+6. Falls aufgefordert, **aktivieren** Sie die Seite für die entsprechenden Benutzer/Profile
+</Steps>
+
+### Empfehlungen zur Komponentenplatzierung
+
+| Position | Am besten geeignet für |
+|----------|----------|
+| **Right Sidebar** | Schnellzugriff ohne Belegung des Hauptinhaltsbereichs |
+| **Related Lists Section** | Gruppiert Teammitglieder mit anderen verwandten Daten |
+| **New Tab** | Am besten für komplexe Team-Management-Szenarien |
+
+## Verifizierungs-Checkliste
+
+Nach Abschluss der Installation überprüfen Sie Folgendes:
+
+- [ ] OWD-Freigabeeinstellungen sind für Zielobjekte korrekt konfiguriert
+- [ ] Admin-Benutzer haben die Admin Permission Set Group zugewiesen
+- [ ] Endbenutzer haben die User Permission Set Group zugewiesen
+- [ ] Mindestens ein Objekt ist im Configuration Wizard konfiguriert
+- [ ] Team Member-Komponente ist zur Datensatzseite hinzugefügt
+- [ ] Cleanup-Scheduled-Job läuft (siehe [Konfiguration](/de/getting-started/configuration/#scheduled-job))

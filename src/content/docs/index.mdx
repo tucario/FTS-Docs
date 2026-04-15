@@ -1,0 +1,52 @@
+---
+title: Flexible Team Share
+description: Extend Salesforce Account Team Member functionality to any object.
+template: splash
+hero:
+  tagline: Create collaborative teams, manage access, and automate sharing — all within the Salesforce platform.
+  image:
+    file: ../../assets/logo.png
+  actions:
+    - text: Get Started
+      link: /docs/getting-started/installation/
+      icon: right-arrow
+      variant: primary
+    - text: View Architecture
+      link: /docs/architecture/overview/
+      icon: seti:config
+---
+
+import { LinkCard, CardGrid } from '@astrojs/starlight/components';
+
+## Key Features
+
+<CardGrid>
+	<LinkCard title="Universal Team Membership" href="/docs/getting-started/installation/" description="Add team members to any object, not just Accounts. Supports standard and custom objects with Private or Public Read Only OWD." />
+	<LinkCard title="Automatic Record Sharing" href="/docs/architecture/sharing-model/" description="Team members automatically receive appropriate access. Share records are created, updated, and removed automatically." />
+	<LinkCard title="Role-Based Access" href="/docs/architecture/security/" description="Owner, Manager, and User roles with distinct permissions. Managers can add/edit/remove team members." />
+	<LinkCard title="Temporary Assignments" href="/docs/getting-started/configuration/#temporary-access-with-end-date" description="Time-limited team memberships with automatic cleanup. Set an end date and expired members are removed automatically." />
+</CardGrid>
+
+## Supported Objects
+
+- **Standard Objects**: Account, Contact, Case, Lead, Opportunity, Campaign, Order
+- **Custom Objects**: Any custom object with Private or Public Read Only OWD
+
+## Quick Start
+
+1. **Install** the package from AppExchange
+2. **Assign** permission sets (FTS_App_Access for admins, FTS_Data_Access for users)
+3. **Configure** objects via the Configuration Wizard
+4. **Add** the Team Member component to record pages
+
+Ready to begin? Head to the [Installation Guide](/docs/getting-started/installation/).
+
+## Package Info
+
+| Property | Value |
+|----------|-------|
+| **Namespace** | `tucariofts` |
+| **Publisher** | Tucario |
+| **API Version** | 65.0 |
+| **Package Type** | 2GP Managed Package |
+| **Support** | hello@tucario.com |

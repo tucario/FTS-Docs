@@ -1,0 +1,175 @@
+---
+title: Bezpieczeństwo
+description: Mechanizmy bezpieczeństwa, model uprawnień i egzekwowanie CRUD/FLS.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+## Model uprawnień
+
+### Permission Sets
+
+```mermaid
+flowchart LR
+    subgraph PS["PERMISSION SETS"]
+        subgraph ADMIN["FTS_App_Access<br/>(Administratorzy)"]
+            A1["App: FlexibleTeamShare"]
+            A2["Tabs: Wszystkie widoczne"]
+            A3["Apex: Wszystkie klasy"]
+            A4["Objects: Pełne CRUD + MAR"]
+            A5["Team_Sharing_Config: CRUD"]
+        end
+
+        subgraph USER["FTS_Data_Access<br/>(Użytkownicy końcowi)"]
+            U1["ObjectTeamMember__c: CRUD"]
+            U2["Team_Sharing_Config__c: Read"]
+            U3["Apex: Tylko kontrolery"]
+            U4["Brak View/Modify All Records"]
+        end
+    end
+```
+
+| Permission Set | Odbiorcy | Możliwości |
+|---------------|----------|-------------|
+| **FTS_App_Access** | Administratorzy | Pełny dostęp do aplikacji, wszystkie zakładki, wszystkie klasy Apex, pełne CRUD + Modify All Records na obiektach, CRUD Team_Sharing_Config |
+| **FTS_Data_Access** | Użytkownicy końcowi | CRUD ObjectTeamMember__c, odczyt Team_Sharing_Config__c, tylko klasy kontrolerów Apex, brak View/Modify All Records |
+
+## Logika kontroli dostępu
+
+```mermaid
+flowchart TB
+    START["Kto może zarządzać<br/>członkami zespołu?"] --> CHECK1{"Administrator<br/>systemu?"}
+    CHECK1 -->|Tak| ALLOWED["DOZWOLONE"]
+    CHECK1 -->|Nie| CHECK2{"Właściciel<br/>rekordu?"}
+    CHECK2 -->|Tak| ALLOWED
+    CHECK2 -->|Nie| CHECK3{"Członek zespołu z<br/>rolą Manager<br/>lub Owner?"}
+    CHECK3 -->|Tak| ALLOWED
+    CHECK3 -->|Nie| DENIED["ZABRONIONE"]
+```
+
+Metoda `isCurrentUserManager()` określa, kto może zarządzać członkami zespołu:
+
+1. **Administratorzy systemu** — zawsze dozwolone
+2. **Właściciele rekordów** — zawsze dozwolone
+3. **Członkowie zespołu z rolą Manager/Owner** — dozwolone
+4. **Wszyscy pozostali** — zabronione
+
+## Egzekwowanie CRUD/FLS
+
+```mermaid
+flowchart LR
+    subgraph CRUD["Sprawdzenia CRUD/FLS"]
+        C["Create"] --> C1["isCreateable()"]
+        U["Update"] --> U1["isUpdateable() +<br/>isCurrentUserManager()"]
+        D["Delete"] --> D1["isDeletable() +<br/>isCurrentUserManager()"]
+        R["Read"] --> R1["WITH USER_MODE"]
+    end
+
+    subgraph LOC["Tryb wykonania"]
+        L1["Egzekwowane w kontrolerze"]
+        L2["Podwyższony dostęp<br/>(without sharing)"]
+        L3["Respektuje OWD/Sharing"]
+    end
+
+    C1 --> L1
+    U1 --> L2
+    D1 --> L2
+    R1 --> L3
+```
+
+| Operacja | Sprawdzenie bezpieczeństwa | Implementacja |
+|-----------|---------------|----------------|
+| Utwórz członka zespołu | `Schema.sObjectType.ObjectTeamMember__c.isCreateable()` | Egzekwowane w kontrolerze |
+| Aktualizuj członka zespołu | `isUpdateable()` + `isCurrentUserManager()` | Podwyższony dostęp (without sharing) po autoryzacji |
+| Usuń członka zespołu | `isDeletable()` + `isCurrentUserManager()` | Podwyższony dostęp (without sharing) po autoryzacji |
+| Odczyt członków zespołu | `WITH USER_MODE` / model udostępniania | Respektuje OWD/sharing |
+
+<Aside type="note">
+Operacje Update i Delete używają podwyższonego dostępu (`without sharing`), aby umożliwić menedżerom modyfikację dowolnego członka zespołu w rekordzie, nie tylko tych, których sami utworzyli. Autoryzacja jest zawsze sprawdzana najpierw za pomocą `isCurrentUserManager()`.
+</Aside>
+
+## Walidacja danych wejściowych
+
+| Dane wejściowe | Walidacja | Lokalizacja |
+|-------|-----------|----------|
+| `recordId` | Nie puste, prawidłowy format ID Salesforce | Kontroler |
+| `userId` | Nie puste, prawidłowe ID użytkownika | Kontroler |
+| `accessLevel` | Nie puste, prawidłowa wartość z listy wyboru | Kontroler + Picklist |
+| `role` | Nie puste, prawidłowa wartość z listy wyboru | Kontroler + Picklist |
+| `endDate` | Musi być datą przyszłą lub null | Kontroler + Validation Rule |
+| `objectApiName` | Wyprowadzane z ID Salesforce (nie dane wejściowe użytkownika) | Kontroler |
+
+### Reguły walidacji
+
+| Reguła | Obiekt | Opis |
+|------|--------|-------------|
+| `End_Date_Cannot_Be_Past` | `ObjectTeamMember__c` | Zapobiega ustawieniu daty końcowej w przeszłości |
+
+## Mapowanie poziomu dostępu
+
+```mermaid
+flowchart LR
+    subgraph INPUT["ObjectTeamMember__c<br/>Access_Level__c"]
+        I1["Read Only"]
+        I2["Read/Write"]
+    end
+
+    subgraph OUTPUT["[Object]Share<br/>AccessLevel"]
+        O1["Read"]
+        O2["Edit"]
+    end
+
+    I1 --> O1
+    I2 --> O2
+```
+
+## Pełny przegląd bezpieczeństwa
+
+```mermaid
+flowchart TB
+    subgraph PERM["Permission Sets"]
+        PS1["FTS_App_Access<br/>Administratorzy"]
+        PS2["FTS_Data_Access<br/>Użytkownicy końcowi"]
+    end
+
+    subgraph ACCESS["Kontrola dostępu"]
+        AC1["System Admin"]
+        AC2["Record Owner"]
+        AC3["Rola Manager/Owner"]
+    end
+
+    subgraph SHARE["Model udostępniania"]
+        SH1["ObjectTeamMember__Share"]
+        SH2["[Object]Share"]
+    end
+
+    subgraph LEVELS["Poziomy dostępu"]
+        LV1["Read Only → Read"]
+        LV2["Read/Write → Edit"]
+    end
+
+    PERM --> ACCESS
+    ACCESS --> SHARE
+    SHARE --> LEVELS
+```
+
+## Zaimplementowane najlepsze praktyki bezpieczeństwa
+
+| Kontrola | Status | Implementacja |
+|---------|--------|---------------|
+| Sprawdzenia CRUD w kontrolerach | Zaimplementowane | `isAccessible()`, `isCreateable()`, `isUpdateable()`, `isDeletable()` |
+| Egzekwowanie FLS | Zaimplementowane | Permission Sets kontrolują dostęp do pól |
+| Zapobieganie wstrzykiwaniu SOQL | Zaimplementowane | Bind variables dla danych wejściowych użytkownika, whitelist dla nazw obiektów |
+| Model udostępniania | Zaimplementowane | `with sharing` na kontrolerach, `without sharing` tylko tam, gdzie udokumentowane |
+| Walidacja danych wejściowych | Zaimplementowane | Sprawdzenia null, walidacja formatu, reguły biznesowe |
+| Zapobieganie XSS | Zaimplementowane | Framework LWC obsługuje kodowanie wyjścia |
+
+## Bezpieczeństwo integracji zewnętrznych
+
+| Sprawdzenie | Wynik |
+|-------|--------|
+| Wywołania HTTP | Brak — pakiet nie wykonuje wywołań zewnętrznych |
+| Named Credentials | Nie używane |
+| External Objects | Nie używane |
+| Remote Site Settings | Niewymagane |
+| Naruszenia CSP | Zaliczone — brak naruszeń Content-Security-Policy |

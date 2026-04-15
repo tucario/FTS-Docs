@@ -1,0 +1,420 @@
+---
+title: False Positives
+description: Security scanner warnings reviewed and determined to be false positives or acceptable risks.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+## Summary
+
+| ID | Rule | Severity | File | Status |
+|----|------|----------|------|--------|
+| FP-01 | ApexCRUDViolation | High | ObjectTeamMemberTriggerHandler.cls | Suppressed — Trigger context |
+| FP-02 | ApexCRUDViolation | High | ObjectTeamMemberController.cls (TeamMemberSelector) | Suppressed — Intentional design |
+| FP-03 | ApexSOQLInjection | High | ObjectTeamMemberTriggerHandler.cls | False Positive — Safe source |
+| FP-04 | ApexSOQLInjection | High | ShareRecordQueueable.cls | False Positive — Whitelist |
+| FP-05 | ApexSOQLInjection | High | ObjectTeamMemberController.cls | False Positive — Safe source |
+| FP-06 | DebugStatements | Low | Multiple files | Accepted Risk |
+| FP-07 | Sharing (without sharing) | Medium | SyncOwnerInvocable.cls | Suppressed — Flow-invoked system action |
+| FP-08 | Sharing (without sharing) | Medium | ObjectTeamMemberTriggerHandler.cls | Suppressed — Trigger context |
+| FP-09 | Sharing (without sharing) | Medium | ObjectTeamMemberController.cls (ElevatedDmlOperations) | Suppressed — CRUD checked in caller |
+| FP-10 | Sharing (without sharing) | Medium | ObjectTeamMemberController.cls (TeamMemberSelector) | Suppressed — See FP-02 |
+| FP-11 | FLS Create | High | PostInstallHandler.cls | False Positive — Admin context |
+| FP-12 | FLS Create | High | ObjectTeamMemberTriggerHandler.cls | False Positive — CRUD checked in controller |
+| FP-13 | CRUD Delete | High | ObjectTeamMemberTriggerHandler.cls | False Positive — System share records |
+| FP-14 | CRUD Delete | High | ShareRecordQueueable.cls | False Positive — Permission checked before enqueue |
+| FP-15 | CRUD Delete | High | SharingRecalculationBatch.cls | False Positive — Admin-triggered batch |
+| FP-16 | FLS Update | High | ObjectTeamMemberController.cls | False Positive — `isUpdateable()` check exists |
+| FP-17 | FLS Update | High | SyncOwnerInvocable.cls | Suppressed — Flow-invoked system action |
+| FP-18 | DML Inside Loops | Medium | ObjectTeamMemberTest.cls | Accepted — Test code only |
+| FP-19 | DML Inside Loops | Medium | SyncOwnerInvocableTest.cls | False Positive — No actual DML in loop |
+| FP-20 | Queries Without WHERE/LIMIT | Medium | TeamMemberWizardController.cls | Accepted — Bounded config object |
+| FP-21 | DML Inside Loops | Medium | ObjectTeamMemberTriggerHandler.cls | False Positive — DML is outside loop |
+
+## Detailed Explanations
+
+### FP-01: ApexCRUDViolation in ObjectTeamMemberTriggerHandler
+
+| Attribute | Value |
+|-----------|-------|
+| File | ObjectTeamMemberTriggerHandler.cls |
+| Line | Class level |
+| Rule | ApexCRUDViolation |
+| Severity | High |
+| Status | Suppressed with @SuppressWarnings |
+
+**Reason:** This trigger handler runs in trigger context where CRUD permissions have already been validated by the calling controller (ObjectTeamMemberController). The handler performs system-level operations including auto-creating Owner records and managing share records, which require elevated access.
+
+**Mitigation:** CRUD checks are enforced in ObjectTeamMemberController before any DML operation reaches the trigger.
+
+---
+
+### FP-02: ApexCRUDViolation in TeamMemberSelector
+
+| Attribute | Value |
+|-----------|-------|
+| File | ObjectTeamMemberController.cls |
+| Line | 129-150 (inner class) |
+| Rule | ApexCRUDViolation |
+| Severity | High |
+| Status | Suppressed with @SuppressWarnings |
+
+**Reason:** The TeamMemberSelector inner class intentionally uses "without sharing" to allow users to view team members on records they have access to. This mirrors standard Salesforce AccountTeamMember behavior.
+
+**Mitigation:** Users can only access this via LWC components on records they can already view. The recordId parameter comes from the UI context of an accessible record.
+
+---
+
+### FP-03: ApexSOQLInjection in ObjectTeamMemberTriggerHandler
+
+| Attribute | Value |
+|-----------|-------|
+| File | ObjectTeamMemberTriggerHandler.cls |
+| Lines | 135, 305 |
+| Rule | ApexSOQLInjection |
+| Severity | High |
+| Status | False Positive |
+
+**Reason:** The object name used in dynamic SOQL is derived from a Salesforce ID using the platform method `Id.valueOf(actualRecordId).getSObjectType().getDescribe().getName()`. This cannot be manipulated by users.
+
+**Code Pattern:**
+
+```apex
+String objectName = Id.valueOf(actualRecordId)
+    .getSObjectType().getDescribe().getName();
+String query = 'SELECT OwnerId FROM '
+    + String.escapeSingleQuotes(objectName)
+    + ' WHERE Id = :actualRecordId';
+```
+
+**Mitigation:** Object name comes from Salesforce ID (not user input). Bind variables used for user-controlled values. Additional escaping applied as defense-in-depth.
+
+---
+
+### FP-04: ApexSOQLInjection in ShareRecordQueueable
+
+| Attribute | Value |
+|-----------|-------|
+| File | ShareRecordQueueable.cls |
+| Lines | 138-141, 163-167 |
+| Rule | ApexSOQLInjection |
+| Severity | High |
+| Status | False Positive |
+
+**Reason:** Share object names come from a hardcoded whitelist of standard objects or follow a deterministic pattern for custom objects.
+
+**Whitelist:**
+
+```apex
+Map<String, String> standardShareObjects = new Map<String, String>{
+    'Account' => 'AccountShare',
+    'Contact' => 'ContactShare',
+    'Case' => 'CaseShare',
+    'Lead' => 'LeadShare',
+    'Opportunity' => 'OpportunityShare',
+    'Campaign' => 'CampaignShare',
+    'Order' => 'OrderShare'
+};
+```
+
+**Mitigation:** Object names validated against whitelist. Custom objects follow safe pattern (`ObjectName__c` -> `ObjectName__Share`). Bind variables used for all user-controlled values.
+
+---
+
+### FP-05: ApexSOQLInjection in ObjectTeamMemberController
+
+| Attribute | Value |
+|-----------|-------|
+| File | ObjectTeamMemberController.cls |
+| Line | 89 |
+| Rule | ApexSOQLInjection |
+| Severity | High |
+| Status | False Positive |
+
+**Reason:** Same as FP-03. Object name derived from Salesforce ID using platform API.
+
+**Mitigation:** Object name from `Id.getSObjectType().getDescribe().getName()`. Cannot be spoofed. Bind variable used for record ID.
+
+---
+
+### FP-06: DebugStatements
+
+| Attribute | Value |
+|-----------|-------|
+| Files | ObjectTeamMemberTriggerHandler.cls, ShareRecordQueueable.cls, ExpiredTeamMemberCleanupBatch.cls |
+| Rule | DebugStatements |
+| Severity | Low |
+| Status | Accepted Risk |
+
+**Reason:** Debug statements are retained for production troubleshooting. They log only at ERROR/WARN levels and contain no sensitive data.
+
+**Content logged:** Exception messages, record counts, job status information.
+
+**Mitigation:** Debug output can be filtered via Salesforce Debug Log settings. No PII or credentials logged.
+
+### FP-07: Sharing (without sharing) in SyncOwnerInvocable
+
+| Attribute | Value |
+|-----------|-------|
+| File | SyncOwnerInvocable.cls |
+| Rule | Sharing (without sharing) |
+| Severity | Medium |
+| Status | Suppressed with @SuppressWarnings |
+
+**Reason:** Flow-invoked Invocable Action that synchronizes team member Owner records when parent record ownership changes. Requires system-level access to query and update team member records across sharing boundaries.
+
+**Mitigation:** `@SuppressWarnings('PMD.ApexCRUDViolation')` present. Only callable from Flow (admin-configured). Updates are limited to ObjectTeamMember__c records owned by the system.
+
+---
+
+### FP-08: Sharing (without sharing) in ObjectTeamMemberTriggerHandler
+
+| Attribute | Value |
+|-----------|-------|
+| File | ObjectTeamMemberTriggerHandler.cls |
+| Rule | Sharing (without sharing) |
+| Severity | Medium |
+| Status | Suppressed with @SuppressWarnings |
+
+**Reason:** Trigger handler that manages share records and auto-creates Owner records. Runs in trigger context where the calling controller has already validated CRUD permissions.
+
+**Mitigation:** CRUD checks enforced in ObjectTeamMemberController before any DML reaches the trigger. Share record operations require elevated access by design.
+
+---
+
+### FP-09: Sharing (without sharing) in ElevatedDmlOperations
+
+| Attribute | Value |
+|-----------|-------|
+| File | ObjectTeamMemberController.cls (ElevatedDmlOperations inner class) |
+| Rule | Sharing (without sharing) |
+| Severity | Medium |
+| Status | Suppressed with @SuppressWarnings |
+
+**Reason:** Inner class used for DML operations that require system-level access (e.g., inserting/updating/deleting ObjectTeamMember__c records). The calling methods check `isCreateable()`, `isUpdateable()`, and `isDeletable()` before invoking this class.
+
+**Mitigation:** CRUD checks performed in the outer controller methods before delegation to this inner class.
+
+---
+
+### FP-10: Sharing (without sharing) in TeamMemberSelector
+
+| Attribute | Value |
+|-----------|-------|
+| File | ObjectTeamMemberController.cls (TeamMemberSelector inner class) |
+| Rule | Sharing (without sharing) |
+| Severity | Medium |
+| Status | Suppressed — See FP-02 |
+
+**Reason:** Duplicate of FP-02. The TeamMemberSelector runs without sharing to allow users to see all team members on records they can access, mirroring standard AccountTeamMember behavior.
+
+**Mitigation:** See FP-02 for full explanation.
+
+---
+
+### FP-11: FLS Create in PostInstallHandler
+
+| Attribute | Value |
+|-----------|-------|
+| File | PostInstallHandler.cls |
+| Rule | FLS Create |
+| Severity | High |
+| Status | False Positive |
+
+**Reason:** Post-install script runs in admin context during package installation. Creates PermissionSetAssignment records, which are setup objects that don't support standard FLS checks.
+
+**Mitigation:** Runs only during package install/upgrade by an admin. PermissionSetAssignment is a setup object — FLS enforcement is not applicable.
+
+---
+
+### FP-12: FLS Create in ObjectTeamMemberTriggerHandler
+
+| Attribute | Value |
+|-----------|-------|
+| File | ObjectTeamMemberTriggerHandler.cls |
+| Rule | FLS Create |
+| Severity | High |
+| Status | False Positive |
+
+**Reason:** Auto-creates Owner record in trigger context when the first team member is added to a record. The CRUD check (`isCreateable()`) is performed in the calling controller before the insert that fires this trigger.
+
+**Mitigation:** Cross-class security flow: ObjectTeamMemberController validates CRUD -> DML fires trigger -> handler creates Owner. Scanner cannot trace this cross-class validation.
+
+---
+
+### FP-13: CRUD Delete in ObjectTeamMemberTriggerHandler
+
+| Attribute | Value |
+|-----------|-------|
+| File | ObjectTeamMemberTriggerHandler.cls |
+| Rule | CRUD Delete |
+| Severity | High |
+| Status | False Positive |
+
+**Reason:** Deletes share records (system-managed sharing objects like AccountShare, ContactShare) during team member deletion. These are system objects that require elevated access.
+
+**Mitigation:** `isDeletable()` check performed in ObjectTeamMemberController before the delete DML that triggers this handler. Share records are system-managed and don't support standard CRUD checks.
+
+---
+
+### FP-14: CRUD Delete in ShareRecordQueueable
+
+| Attribute | Value |
+|-----------|-------|
+| File | ShareRecordQueueable.cls |
+| Rule | CRUD Delete |
+| Severity | High |
+| Status | False Positive |
+
+**Reason:** Async job that deletes share records as part of team member lifecycle. Permission is validated in the controller before the queueable job is enqueued.
+
+**Mitigation:** `isDeletable()` checked in ObjectTeamMemberController before enqueueing. The queueable processes requests that have already passed authorization.
+
+---
+
+### FP-15: CRUD Delete in SharingRecalculationBatch
+
+| Attribute | Value |
+|-----------|-------|
+| File | SharingRecalculationBatch.cls |
+| Rule | CRUD Delete |
+| Severity | High |
+| Status | False Positive |
+
+**Reason:** Admin-triggered batch job that recalculates share records when object configuration changes. Only triggered from TeamMemberWizardController which checks `isUpdateable()` on the config object.
+
+**Mitigation:** `isCurrentUserManager()` authorization check in TeamMemberWizardController before batch is executed. Only admins with FTS_App_Access permission set can trigger this.
+
+---
+
+### FP-16: FLS Update in ObjectTeamMemberController
+
+| Attribute | Value |
+|-----------|-------|
+| File | ObjectTeamMemberController.cls |
+| Rule | FLS Update |
+| Severity | High |
+| Status | False Positive |
+
+**Reason:** The `isUpdateable()` check exists in the controller method before the update DML. Scanner failed to recognize the cross-method validation flow.
+
+**Mitigation:** `Schema.sObjectType.ObjectTeamMember__c.isUpdateable()` is checked before any update operation. The check and the DML are in separate methods within the same class.
+
+---
+
+### FP-17: FLS Update in SyncOwnerInvocable
+
+| Attribute | Value |
+|-----------|-------|
+| File | SyncOwnerInvocable.cls |
+| Rule | FLS Update |
+| Severity | High |
+| Status | Suppressed with @SuppressWarnings |
+
+**Reason:** Flow-invoked Invocable Action that updates ObjectTeamMember__c Owner records when parent record ownership changes. Runs as a system action triggered by Flow.
+
+**Mitigation:** `@SuppressWarnings('PMD.ApexCRUDViolation')` present. Only callable from admin-configured Flows. Updates are limited to the Owner role field on team member records.
+
+---
+
+### FP-18: DML Inside Loops in ObjectTeamMemberTest
+
+| Attribute | Value |
+|-----------|-------|
+| File | ObjectTeamMemberTest.cls |
+| Rule | DML Inside Loops |
+| Severity | Medium |
+| Status | Accepted — Test code only |
+
+**Reason:** Test class creates test data in a loop (4 iterations). This is test-only code that never runs in production and is not subject to governor limit concerns at test scale.
+
+**Mitigation:** Test code only. Loop is bounded (4 iterations). No production impact.
+
+---
+
+### FP-19: DML Inside Loops in SyncOwnerInvocableTest
+
+| Attribute | Value |
+|-----------|-------|
+| File | SyncOwnerInvocableTest.cls |
+| Rule | DML Inside Loops |
+| Severity | Medium |
+| Status | False Positive |
+
+**Reason:** Scanner falsely flagged this test class. There is no actual DML inside a loop — the DML statements are sequential test data setup, not loop-enclosed.
+
+**Mitigation:** No DML exists inside any loop in this test class. False detection by scanner.
+
+---
+
+### FP-20: Queries Without WHERE/LIMIT in TeamMemberWizardController
+
+| Attribute | Value |
+|-----------|-------|
+| File | TeamMemberWizardController.cls |
+| Rule | Queries Without WHERE/LIMIT |
+| Severity | Medium |
+| Status | Accepted — Bounded config object |
+
+**Reason:** Queries `Team_Sharing_Config__c` without WHERE/LIMIT to retrieve all configuration records. This custom metadata-like object is inherently bounded — a Salesforce org will have at most ~30 records (one per configured object).
+
+**Mitigation:** `Team_Sharing_Config__c` records are created only by admins through the wizard (one per object type). The practical maximum is ~30 records. Adding a LIMIT would break functionality.
+
+---
+
+### FP-21: DML Inside Loops in ObjectTeamMemberTriggerHandler
+
+| Attribute | Value |
+|-----------|-------|
+| File | ObjectTeamMemberTriggerHandler.cls |
+| Lines | 222–239 (handleBeforeDelete method) |
+| Rule | DML Inside Loops |
+| Severity | Medium |
+| Status | False Positive |
+
+**Reason:** Scanner traces data flow from a `for` loop (L222–229) that collects IDs into sets, through to `delete` DML statements that execute **after** the loop ends (L234, L239). The loop contains no DML — it only calls `Set.add()`. All DML operations are bulkified and executed outside the loop.
+
+**Code Pattern:**
+
+```apex
+// Loop only collects IDs — no DML here
+for (ObjectTeamMember__c member : oldMembers) {
+    deletingMemberIds.add(member.Id);
+    if (member.Role__c != 'Owner') {
+        recordIdsToCheck.add(member.Record_Id__c);
+    }
+}
+
+// DML executes AFTER the loop, bulkified
+List<SObject> sharesToDelete = getShareRecordsBulk(oldMembers);
+if (!sharesToDelete.isEmpty()) {
+    delete sharesToDelete;
+}
+if (!recordIdsToCheck.isEmpty()) {
+    deleteOrphanedOwners(recordIdsToCheck, deletingMemberIds);
+}
+```
+
+**Mitigation:** The code follows Salesforce bulk processing best practices — collect in loop, DML outside loop. Scanner incorrectly flags cross-boundary data flow as "DML inside loop".
+
+---
+
+## Security Controls Summary
+
+| Control | Status | Implementation |
+|---------|--------|---------------|
+| CRUD checks in controllers | Implemented | `isAccessible()`, `isCreateable()`, `isUpdateable()`, `isDeletable()` |
+| FLS enforcement | Implemented | Permission Sets control field access |
+| SOQL injection prevention | Implemented | Bind variables for user input, whitelist for object names |
+| Sharing model | Implemented | `with sharing` on controllers, `without sharing` only where documented |
+| Input validation | Implemented | Null checks, format validation, business rules |
+| XSS prevention | Implemented | LWC framework handles output encoding |
+
+## External Integrations
+
+| Check | Result |
+|-------|--------|
+| HTTP Callouts | None — package makes no external calls |
+| Named Credentials | Not used |
+| External Objects | Not used |
+| Remote Site Settings | Not required |

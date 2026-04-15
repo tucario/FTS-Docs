@@ -1,0 +1,140 @@
+---
+title: Konfiguracja początkowa
+description: Przypadki użycia administratora dla wstępnej konfiguracji Flexible Team Share.
+---
+
+import { Aside, Steps } from '@astrojs/starlight/components';
+
+## Przypadek użycia 1: Konfiguracja początkowa (Admin)
+
+### Cel
+
+Skonfigurowanie Flexible Team Share do pierwszego użycia w organizacji.
+
+### Wymagania wstępne
+
+- Profil System Administrator
+- Przypisany Permission Set FTS_App_Access
+
+### Kroki
+
+| Krok | Akcja | Oczekiwany wynik |
+|------|--------|----------------|
+| 1 | Przejdź do App Launcher | Wyszukiwanie pokazuje aplikację "FlexiTeam" |
+| 2 | Otwórz aplikację FlexiTeam | Ładuje się strona główna FlexiTeam |
+| 3 | Kliknij zakładkę "Configuration Wizard" | Kreator wyświetla się z dwiema sekcjami |
+| 4 | W sekcji "Object Configuration" kliknij "Add Object" | Otwiera się okno z dostępnymi obiektami |
+| 5 | Wybierz "Case" z listy rozwijanej | Obiekt Case wybrany |
+| 6 | Kliknij "Save" | Konfiguracja zapisana, Case pojawia się na liście jako aktywny |
+| 7 | (Opcjonalnie) Zaplanuj zadanie czyszczenia | Zadanie zaplanowane, wyświetlany czas następnego uruchomienia |
+
+![Configuration Wizard](../../../../assets/pictures/config-wizard.png)
+
+### Punkty weryfikacji
+
+- [ ] Na liście rozwijanej pojawiają się tylko obiekty z OWD Private/Public Read Only
+- [ ] Już skonfigurowane obiekty nie pojawiają się na liście rozwijanej
+- [ ] Przełącznik Active działa poprawnie
+- [ ] Zadanie czyszczenia można zaplanować/odplanować
+
+---
+
+## Przypadek użycia 7: Dezaktywacja konfiguracji obiektu (Admin)
+
+### Cel
+
+Wyłączenie udostępniania zespołowego dla obiektu i usunięcie istniejących udostępnień.
+
+### Wymagania wstępne
+
+- Obiekt już skonfigurowany i aktywny
+- Członkowie zespołu istnieją dla tego obiektu
+
+### Kroki
+
+| Krok | Akcja | Oczekiwany wynik |
+|------|--------|----------------|
+| 1 | Otwórz Configuration Wizard | Lista konfiguracji widoczna |
+| 2 | Przełącz przełącznik "Active" na wyłączony dla Case | Okno dialogowe potwierdzenia |
+| 3 | Potwierdź dezaktywację | Status zmienia się na nieaktywny |
+| 4 | Sprawdź istniejące zespoły Case | Członkowie zespołu pozostają, ale udostępnienia usunięte |
+
+### Punkty weryfikacji
+
+- [ ] Zadanie wsadowe uruchamia się, aby usunąć rekordy udostępnień
+- [ ] Rekordy członków zespołu zachowane
+- [ ] Można reaktywować później (udostępnienia odtworzone)
+- [ ] Pokazane ostrzeżenie o usunięciu udostępnień
+
+---
+
+## Przypadek użycia 9: Ręczne wykonanie czyszczenia (Admin)
+
+### Cel
+
+Ręczne wyzwolenie czyszczenia wygasłych członków zespołu.
+
+### Wymagania wstępne
+
+- Dostęp administratora
+- Istnieją wygasłe członkowie zespołu (End_Date__c w przeszłości)
+
+### Kroki
+
+| Krok | Akcja | Oczekiwany wynik |
+|------|--------|----------------|
+| 1 | Otwórz Configuration Wizard | Sekcja Scheduled Jobs widoczna |
+| 2 | Wyświetl licznik "Expired Members" | Pokazuje liczbę wygasłych rekordów |
+| 3 | Kliknij "Run Cleanup Now" | Zadanie wsadowe startuje |
+| 4 | Odśwież stronę | Licznik wygasłych spadł do 0 |
+
+### Punkty weryfikacji
+
+- [ ] Licznik wygasłych dokładny
+- [ ] Zadanie wsadowe kończy się pomyślnie
+- [ ] Wygasłe członkowie usunięci
+- [ ] Powiązane rekordy udostępnień usunięte
+
+---
+
+## Przypadek użycia 11: Konfiguracja wyświetlania komponentu (Admin)
+
+### Cel
+
+Dostosowanie wyglądu komponentu Object Team Member: zmiana tytułu karty i ustawienie maksymalnej liczby wyświetlanych członków zespołu.
+
+### Wymagania wstępne
+
+- Profil System Administrator
+- Dostęp do Lightning App Builder
+
+### Kroki
+
+| Krok | Akcja | Oczekiwany wynik |
+|------|--------|----------------|
+| 1 | Otwórz stronę rekordu w Lightning App Builder | Edytor strony się ładuje |
+| 2 | Kliknij na komponent "Team Members" | Panel właściwości komponentu otwiera się po prawej |
+| 3 | Zmień "Card Title" na niestandardową wartość | Podgląd tytułu aktualizuje się |
+| 4 | Ustaw "Max Displayed Members" na żądaną liczbę | Limit wyświetlania skonfigurowany |
+| 5 | Zapisz i aktywuj stronę | Zmiany zastosowane |
+| 6 | Otwórz rekord z członkami zespołu | Komponent pokazuje skonfigurowany tytuł i respektuje limit wyświetlania |
+
+![Konfiguracja Lightning App Builder](../../../../assets/pictures/app-builder-config.png)
+
+### Opcje konfiguracji
+
+| Ustawienie | Wartości | Zachowanie |
+|---------|--------|----------|
+| Max Displayed Members = 5 | Domyślnie | Pokazuje pierwszych 5 członków, "Show X more" dla pozostałych |
+| Max Displayed Members = 0 | Pokaż wszystkich | Wszyscy członkowie zespołu widoczni, bez zwijania/rozwijania |
+| Max Displayed Members = 3 | Niestandardowy limit | Pokazuje pierwszych 3 członków, "Show X more" dla pozostałych |
+
+### Punkty weryfikacji
+
+- [ ] Zmiana tytułu karty odzwierciedlona na stronie rekordu
+- [ ] Limit wyświetlania respektowany (pokazana prawidłowa liczba członków)
+- [ ] Przycisk "Show X more" pojawia się, gdy członków jest więcej niż limit
+- [ ] Ustawienie limitu na 0 pokazuje wszystkich członków bez przycisku zwijania
+- [ ] Właściciel rekordu zawsze pojawia się pierwszy niezależnie od limitu
+- [ ] Przycisk "Show less" zwija listę z powrotem do skonfigurowanego limitu
+- [ ] Zmiany utrzymują się po odświeżeniu strony
