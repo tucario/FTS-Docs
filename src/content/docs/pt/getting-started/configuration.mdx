@@ -231,6 +231,22 @@ Administradores podem gerenciar o cleanup job no Configuration Wizard:
 
 ![Erro No Access](../../../../assets/pictures/install-guide-16.png)
 
+### O erro "This operation requires the FTS Admin permission set" persiste
+
+**Sintoma:** Ao implantar uma configuração no Configuration Wizard (selecionando um objeto e clicando em **Deploy Settings**), o erro **"This operation requires the FTS Admin permission set"** aparece — mesmo que o permission set **Flexible Team Share - Admin** já tenha sido atribuído ao usuário.
+
+**Causa:** Trata-se de uma peculiaridade de cache de permissões do Salesforce. Após um permission set ser atribuído, o Salesforce às vezes continua avaliando o estado de permissões anterior do usuário durante a sessão ativa, de modo que o acesso recém-concedido não é reconhecido imediatamente.
+
+**Solução:**
+<Steps>
+1. Verifique se o permission set **Flexible Team Share - Admin** (ou o Admin Permission Set Group) está atribuído ao usuário em **Setup** > **Permission Set Groups** / **Permission Sets**
+2. Faça um hard refresh no navegador para forçar o Salesforce a reavaliar as permissões:
+   - <svg viewBox="0 0 24 24" fill="currentColor" style={{display:'inline-block',width:'1em',height:'1em',verticalAlign:'-0.125em',marginRight:'0.4em'}} aria-hidden="true"><path d="M0 3.449L9.75 2.1v9.451H0m10.949-9.602L24 0v11.4H10.949M0 12.6h9.75v9.451L0 20.699M10.949 12.6H24V24l-12.9-1.801" /></svg> **Windows:** `Ctrl + Shift + R`
+   - <svg viewBox="0 0 24 24" fill="currentColor" style={{display:'inline-block',width:'1em',height:'1em',verticalAlign:'-0.125em',marginRight:'0.4em'}} aria-hidden="true"><path d="M12.152 6.896c-.948 0-2.415-1.078-3.96-1.04-2.04.027-3.91 1.183-4.961 3.014-2.117 3.675-.546 9.103 1.519 12.09 1.013 1.454 2.208 3.09 3.792 3.039 1.52-.065 2.09-.987 3.935-.987 1.831 0 2.35.987 3.96.948 1.637-.026 2.676-1.48 3.676-2.948 1.156-1.688 1.636-3.325 1.662-3.415-.039-.013-3.182-1.221-3.22-4.857-.026-3.04 2.48-4.494 2.597-4.559-1.429-2.09-3.623-2.324-4.39-2.376-2-.156-3.675 1.09-4.61 1.09zM15.53 3.83c.843-1.012 1.4-2.427 1.245-3.83-1.207.052-2.662.805-3.532 1.818-.78.896-1.454 2.338-1.273 3.714 1.338.104 2.715-.688 3.559-1.701" /></svg> **Mac:** `Cmd + Shift + R`
+3. Se o erro persistir, faça logout e login novamente para iniciar uma nova sessão
+4. Tente novamente a ação **Deploy Settings** — a operação agora deve ser concluída com sucesso
+</Steps>
+
 ### Aviso "Limit Reached"
 
 **Sintoma:** O botão "Add Team Member" está desabilitado e uma mensagem indica que o limite foi atingido.
